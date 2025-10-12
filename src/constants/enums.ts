@@ -136,3 +136,40 @@ export enum ConnectionCommitment {
   FINALIZED = "finalized",
   PROCESSED = "processed",
 }
+
+// Typography enums
+export enum TypographyVariant {
+  DISPLAY_LARGE = "displayLarge",
+  DISPLAY_MEDIUM = "displayMedium",
+  DISPLAY_SMALL = "displaySmall",
+  HEADLINE_LARGE = "headlineLarge",
+  HEADLINE_MEDIUM = "headlineMedium",
+  HEADLINE_SMALL = "headlineSmall",
+  TITLE_LARGE = "titleLarge",
+  TITLE_MEDIUM = "titleMedium",
+  TITLE_SMALL = "titleSmall",
+  BODY_LARGE = "bodyLarge",
+  BODY_MEDIUM = "bodyMedium",
+  BODY_SMALL = "bodySmall",
+  LABEL_LARGE = "labelLarge",
+  LABEL_MEDIUM = "labelMedium",
+  LABEL_SMALL = "labelSmall",
+  CAPTION = "caption",
+  MONOSPACE = "monospace",
+}
+
+export enum TypographyWeight {
+  LIGHT = "300",
+  REGULAR = "400",
+  MEDIUM = "500",
+  SEMIBOLD = "600",
+  BOLD = "700",
+  EXTRABOLD = "800",
+}
+
+export enum TypographyAlign {
+  LEFT = "left",
+  CENTER = "center",
+  RIGHT = "right",
+  JUSTIFY = "justify",
+}

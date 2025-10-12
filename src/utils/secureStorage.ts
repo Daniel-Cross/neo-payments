@@ -54,6 +54,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.ACCESS_WALLET,
+          keychainService: SecureStorageService.BLINK_WALLET,
         }
       );
 
@@ -78,7 +79,9 @@ export class SecureWalletStorage {
    */
   static async getPublicKey(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(StorageKey.WALLET_PUBLIC_KEY);
+      return await SecureStore.getItemAsync(StorageKey.WALLET_PUBLIC_KEY, {
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
     } catch (error) {
       console.error("Failed to retrieve public key:", error);
       return null;
@@ -103,8 +106,12 @@ export class SecureWalletStorage {
    */
   static async removeWallet(): Promise<boolean> {
     try {
-      await SecureStore.deleteItemAsync(StorageKey.WALLET_PRIVATE_KEY);
-      await SecureStore.deleteItemAsync(StorageKey.WALLET_PUBLIC_KEY);
+      await SecureStore.deleteItemAsync(StorageKey.WALLET_PRIVATE_KEY, {
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
+      await SecureStore.deleteItemAsync(StorageKey.WALLET_PUBLIC_KEY, {
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
       return true;
     } catch (error) {
       console.error("Failed to remove wallet from secure storage:", error);
@@ -123,6 +130,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.EXPORT_PRIVATE_KEY,
+          keychainService: SecureStorageService.BLINK_WALLET,
         }
       );
 
@@ -150,6 +158,94 @@ export class SecureWalletStorage {
     } catch (error) {
       console.error("Secure storage not available:", error);
       return false;
+    }
+  }
+
+  /**
+   * Test secure storage with authentication
+   */
+  static async testWithAuth(): Promise<boolean> {
+    try {
+      const testKey = "test_auth_key";
+      const testValue = "test_auth_value";
+
+      await SecureStore.setItemAsync(testKey, testValue, {
+        requireAuthentication: true,
+        authenticationPrompt: "Test authentication",
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
+
+      const retrievedValue = await SecureStore.getItemAsync(testKey, {
+        requireAuthentication: true,
+        authenticationPrompt: "Test authentication",
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
+
+      await SecureStore.deleteItemAsync(testKey);
+
+      return retrievedValue === testValue;
+    } catch (error) {
+      console.error("Secure storage with auth test failed:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Debug function to check what's stored in secure storage
+   */
+  static async debugStorage(): Promise<void> {
+    try {
+      // Test basic storage/retrieval with keychain service
+      const testKey = "debug_test_key";
+      const testValue = "debug_test_value";
+
+      try {
+        await SecureStore.setItemAsync(testKey, testValue, {
+          keychainService: SecureStorageService.BLINK_WALLET,
+        });
+        const retrievedTest = await SecureStore.getItemAsync(testKey, {
+          keychainService: SecureStorageService.BLINK_WALLET,
+        });
+        console.log(
+          "Basic test result:",
+          retrievedTest === testValue ? "PASS" : "FAIL"
+        );
+        await SecureStore.deleteItemAsync(testKey, {
+          keychainService: SecureStorageService.BLINK_WALLET,
+        });
+      } catch (error) {
+        console.log("Basic test failed:", error);
+      }
+
+      // Check public key
+      const publicKey = await SecureStore.getItemAsync(
+        StorageKey.WALLET_PUBLIC_KEY,
+        {
+          keychainService: SecureStorageService.BLINK_WALLET,
+        }
+      );
+      console.log("Public key stored:", publicKey ? "Yes" : "No");
+      if (publicKey) {
+        console.log("Public key value:", publicKey);
+      }
+
+      // Check if private key exists (without auth for debugging)
+      try {
+        const privateKeyNoAuth = await SecureStore.getItemAsync(
+          StorageKey.WALLET_PRIVATE_KEY,
+          {
+            keychainService: SecureStorageService.BLINK_WALLET,
+          }
+        );
+        console.log(
+          "Private key exists (no auth):",
+          privateKeyNoAuth ? "Yes" : "No"
+        );
+      } catch (error) {
+        console.log("Private key requires authentication (expected)");
+      }
+    } catch (error) {
+      console.error("Debug storage failed:", error);
     }
   }
 }

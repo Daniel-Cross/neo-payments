@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { THEME } from "../constants/colours";
 import { ThemeMode } from "../constants/enums";
 

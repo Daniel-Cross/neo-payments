@@ -5,6 +5,7 @@ import {
   PublicKey,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
+import * as bip39 from "bip39";
 import { SecureWalletStorage } from "../utils/secureStorage";
 import { SolanaNetwork, ConnectionCommitment } from "../constants/enums";
 
@@ -29,7 +30,10 @@ export interface WalletState {
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
   exportPrivateKey: () => Promise<string | null>;
+  exportSeedPhrase: () => Promise<string | null>;
   checkSecureStorage: () => Promise<boolean>;
+  testSecureStorage: () => Promise<{ basicTest: boolean; authTest: boolean }>;
+  debugStorage: () => Promise<void>;
 }
 
 export const useWalletStore = create<WalletState>()((set, get) => ({
@@ -46,6 +50,13 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     try {
       const keypair = Keypair.generate();
       const publicKey = keypair.publicKey.toString();
+
+      // Verify the keypair is valid
+      const testKeypair = Keypair.fromSecretKey(keypair.secretKey);
+      const testPublicKey = testKeypair.publicKey.toString();
+      if (testPublicKey !== publicKey) {
+        throw new Error("Generated keypair validation failed");
+      }
 
       // Store wallet securely
       const stored = await SecureWalletStorage.storeWallet(keypair);
@@ -82,14 +93,13 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       );
 
       const keypair = Keypair.fromSecretKey(privateKeyBytes);
+      const publicKey = keypair.publicKey.toString();
 
       // Store wallet securely
       const stored = await SecureWalletStorage.storeWallet(keypair);
       if (!stored) {
         throw new Error("Failed to store wallet securely");
       }
-
-      const publicKey = keypair.publicKey.toString();
 
       set({
         keypair,
@@ -177,6 +187,32 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
+  // Export seed phrase (for backup purposes)
+  exportSeedPhrase: async () => {
+    try {
+      // Get the private key from secure storage
+      const privateKeyHex = await SecureWalletStorage.exportPrivateKey();
+      if (!privateKeyHex) {
+        return null;
+      }
+
+      // Convert hex string back to Uint8Array
+      const privateKeyBytes = new Uint8Array(
+        privateKeyHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+      );
+
+      // Generate mnemonic from the private key
+      // Note: This creates a mnemonic that can regenerate the same private key
+      const seed = Buffer.from(privateKeyBytes.slice(0, 32)); // Use first 32 bytes for seed
+      const mnemonic = bip39.entropyToMnemonic(seed.toString("hex"));
+
+      return mnemonic;
+    } catch (error) {
+      console.error("Failed to export seed phrase:", error);
+      return null;
+    }
+  },
+
   // Check if secure storage is available
   checkSecureStorage: async () => {
     try {
@@ -184,6 +220,27 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     } catch (error) {
       console.error("Failed to check secure storage:", error);
       return false;
+    }
+  },
+
+  // Test secure storage functionality
+  testSecureStorage: async () => {
+    try {
+      const basicTest = await SecureWalletStorage.isAvailable();
+      const authTest = await SecureWalletStorage.testWithAuth();
+      return { basicTest, authTest };
+    } catch (error) {
+      console.error("Failed to test secure storage:", error);
+      return { basicTest: false, authTest: false };
+    }
+  },
+
+  // Debug secure storage
+  debugStorage: async () => {
+    try {
+      await SecureWalletStorage.debugStorage();
+    } catch (error) {
+      console.error("Failed to debug storage:", error);
     }
   },
 }));

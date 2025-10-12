@@ -1,5 +1,4 @@
-import React from "react";
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { StyleSheet, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../contexts/ThemeContext";
 import { CardVariant } from "../constants/enums";

@@ -1,20 +1,34 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import { useWalletStore } from "../store/walletStore";
 import { useTheme } from "../contexts/ThemeContext";
 import { GradientCard } from "../components/GradientCard";
 import { GradientButton } from "../components/GradientButton";
+import { formatWalletAddress } from "../utils/walletUtils";
 import {
-  AlertTitle,
+  createWalletHandler,
+  importWalletHandler,
+  disconnectWalletHandler,
+  exportPrivateKeyHandler,
+  exportSeedPhraseHandler,
+  testSecureStorageHandler,
+  refreshBalanceHandler,
+} from "../utils/walletHandlers";
+import {
+  Typography,
+  DisplaySmall,
+  HeadlineSmall,
+  BodyMedium,
+  LabelMedium,
+  Monospace,
+} from "../components/Typography";
+import {
   AlertMessage,
   ButtonText,
   ScreenTitle,
@@ -23,6 +37,7 @@ import {
   CardVariant,
   ButtonVariant,
   ButtonSize,
+  TypographyVariant,
 } from "../constants/enums";
 
 export default function WalletScreen() {
@@ -39,7 +54,10 @@ export default function WalletScreen() {
     disconnectWallet,
     updateBalance,
     exportPrivateKey,
+    exportSeedPhrase,
     checkSecureStorage,
+    testSecureStorage,
+    debugStorage,
   } = useWalletStore();
 
   const [privateKeyInput, setPrivateKeyInput] = useState("");
@@ -68,164 +86,104 @@ export default function WalletScreen() {
   }, [isConnected, keypair, updateBalance]);
 
   const handleCreateWallet = async () => {
-    if (!secureStorageAvailable) {
-      Alert.alert(
-        AlertTitle.SECURE_STORAGE_UNAVAILABLE,
-        AlertMessage.SECURE_STORAGE_UNAVAILABLE_CREATE,
-        [{ text: ButtonText.OK }]
-      );
-      return;
-    }
-
-    try {
-      const success = await createNewWallet();
-      if (success) {
-        Alert.alert(
-          AlertTitle.WALLET_CREATED,
-          AlertMessage.WALLET_CREATED_SUCCESS,
-          [{ text: ButtonText.OK }]
-        );
-      } else {
-        Alert.alert(AlertTitle.ERROR, AlertMessage.CREATE_WALLET_ERROR);
-      }
-    } catch (error) {
-      Alert.alert(AlertTitle.ERROR, AlertMessage.CREATE_WALLET_ERROR);
-    }
+    await createWalletHandler(createNewWallet, secureStorageAvailable);
   };
 
   const handleImportWallet = async () => {
-    if (!privateKeyInput.trim()) {
-      Alert.alert(AlertTitle.ERROR, AlertMessage.ENTER_PRIVATE_KEY);
-      return;
-    }
-
-    if (!secureStorageAvailable) {
-      Alert.alert(
-        AlertTitle.SECURE_STORAGE_UNAVAILABLE,
-        AlertMessage.SECURE_STORAGE_UNAVAILABLE_IMPORT,
-        [{ text: ButtonText.OK }]
-      );
-      return;
-    }
-
-    try {
-      const success = await importWallet(privateKeyInput.trim());
-      if (success) {
-        Alert.alert(
-          AlertTitle.WALLET_IMPORTED,
-          AlertMessage.WALLET_IMPORTED_SUCCESS
-        );
+    const success = await importWalletHandler(
+      importWallet,
+      privateKeyInput,
+      secureStorageAvailable,
+      () => {
         setPrivateKeyInput("");
         setShowImportForm(false);
-      } else {
-        Alert.alert(AlertTitle.ERROR, AlertMessage.INVALID_PRIVATE_KEY);
       }
-    } catch (error) {
-      Alert.alert(AlertTitle.ERROR, AlertMessage.IMPORT_WALLET_ERROR);
-    }
-  };
-
-  const handleDisconnect = () => {
-    Alert.alert(
-      AlertTitle.DISCONNECT_WALLET,
-      AlertMessage.DISCONNECT_CONFIRMATION,
-      [
-        { text: ButtonText.CANCEL, style: "cancel" },
-        {
-          text: ButtonText.DISCONNECT,
-          style: "destructive",
-          onPress: disconnectWallet,
-        },
-      ]
     );
   };
 
-  const handleExportPrivateKey = async () => {
-    try {
-      const privateKey = await exportPrivateKey();
-      if (privateKey) {
-        Alert.alert(
-          AlertTitle.PRIVATE_KEY,
-          `Your private key: ${privateKey}\n\n⚠️ ${AlertMessage.PRIVATE_KEY_WARNING}`,
-          [
-            {
-              text: ButtonText.COPY,
-              onPress: () => {
-                /* TODO: Implement copy to clipboard */
-              },
-            },
-            { text: ButtonText.OK },
-          ]
-        );
-      } else {
-        Alert.alert(AlertTitle.ERROR, AlertMessage.EXPORT_PRIVATE_KEY_ERROR);
-      }
-    } catch (error) {
-      Alert.alert(AlertTitle.ERROR, AlertMessage.EXPORT_PRIVATE_KEY_ERROR);
-    }
+  const handleDisconnect = async () => {
+    await disconnectWalletHandler(disconnectWallet);
   };
 
-  const formatAddress = (address: string) => {
-    if (address.length <= 12) return address;
-    return `${address.slice(0, 6)}...${address.slice(-6)}`;
+  const handleExportPrivateKey = async () => {
+    await exportPrivateKeyHandler(exportPrivateKey);
+  };
+
+  const handleExportSeedPhrase = async () => {
+    await exportSeedPhraseHandler(exportSeedPhrase);
+  };
+
+  const handleTestSecureStorage = async () => {
+    await testSecureStorageHandler(testSecureStorage);
   };
 
   if (isConnected && keypair && publicKey) {
     return (
       <ScrollView style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
+          <DisplaySmall color={theme.text.SOFT_WHITE}>
             {ScreenTitle.MY_WALLET}
-          </Text>
+          </DisplaySmall>
           <TouchableOpacity
             style={styles.disconnectButton}
             onPress={handleDisconnect}
           >
-            <Text style={styles.disconnectText}>{ButtonText.DISCONNECT}</Text>
+            <Typography
+              variant={TypographyVariant.TITLE_MEDIUM}
+              color="#ff4444"
+              weight="600"
+            >
+              {ButtonText.DISCONNECT}
+            </Typography>
           </TouchableOpacity>
         </View>
 
         <GradientCard variant={CardVariant.ELEVATED} style={styles.walletCard}>
-          <Text style={[styles.balanceLabel, { color: theme.text.LIGHT_GREY }]}>
+          <LabelMedium color={theme.text.LIGHT_GREY}>
             {LabelText.SOL_BALANCE}
-          </Text>
-          <Text
-            style={[
-              styles.balanceAmount,
-              { color: theme.colors.PRIMARY_GREEN },
-            ]}
+          </LabelMedium>
+          <Typography
+            variant={TypographyVariant.DISPLAY_MEDIUM}
+            color={theme.colors.PRIMARY_GREEN}
+            weight="700"
+            style={styles.balanceAmount}
           >
             {balance.toFixed(4)} SOL
-          </Text>
+          </Typography>
 
           <View style={styles.addressContainer}>
-            <Text
-              style={[styles.addressLabel, { color: theme.text.LIGHT_GREY }]}
-            >
+            <LabelMedium color={theme.text.LIGHT_GREY}>
               {LabelText.WALLET_ADDRESS}
-            </Text>
-            <Text
-              style={[styles.addressText, { color: theme.text.SOFT_WHITE }]}
-            >
-              {formatAddress(publicKey)}
-            </Text>
+            </LabelMedium>
+            <Monospace color={theme.text.SOFT_WHITE}>
+              {formatWalletAddress(publicKey)}
+            </Monospace>
           </View>
 
           <GradientButton
             title={ButtonText.REFRESH_BALANCE}
-            onPress={updateBalance}
+            onPress={() => refreshBalanceHandler(updateBalance)}
             variant={ButtonVariant.SECONDARY}
             size={ButtonSize.MEDIUM}
             style={styles.refreshButton}
           />
 
-          <GradientButton
-            title={ButtonText.EXPORT_PRIVATE_KEY}
-            onPress={handleExportPrivateKey}
-            variant={ButtonVariant.SECONDARY}
-            size={ButtonSize.MEDIUM}
-            style={styles.exportButton}
-          />
+          <View style={styles.exportButtonsContainer}>
+            <GradientButton
+              title="Export Private Key"
+              onPress={handleExportPrivateKey}
+              variant={ButtonVariant.SECONDARY}
+              size={ButtonSize.MEDIUM}
+              style={styles.exportButton}
+            />
+            <GradientButton
+              title="Export Seed Phrase"
+              onPress={handleExportSeedPhrase}
+              variant={ButtonVariant.SECONDARY}
+              size={ButtonSize.MEDIUM}
+              style={styles.exportButton}
+            />
+          </View>
         </GradientCard>
 
         <View style={styles.actionsContainer}>
@@ -255,20 +213,18 @@ export default function WalletScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
+        <DisplaySmall color={theme.text.SOFT_WHITE}>
           {ScreenTitle.CONNECT_WALLET}
-        </Text>
+        </DisplaySmall>
       </View>
 
       <GradientCard variant={CardVariant.ELEVATED} style={styles.welcomeCard}>
-        <Text style={[styles.welcomeTitle, { color: theme.text.SOFT_WHITE }]}>
+        <HeadlineSmall color={theme.text.SOFT_WHITE}>
           {ScreenTitle.WELCOME_TO_BLINK}
-        </Text>
-        <Text
-          style={[styles.welcomeSubtitle, { color: theme.text.LIGHT_GREY }]}
-        >
+        </HeadlineSmall>
+        <BodyMedium color={theme.text.LIGHT_GREY}>
           {LabelText.WELCOME_SUBTITLE}
-        </Text>
+        </BodyMedium>
       </GradientCard>
 
       <View style={styles.optionsContainer}>
@@ -283,7 +239,6 @@ export default function WalletScreen() {
           size={ButtonSize.LARGE}
           disabled={isLoading || !secureStorageAvailable}
           loading={isLoading}
-          style={styles.optionButton}
         />
 
         <GradientButton
@@ -296,19 +251,29 @@ export default function WalletScreen() {
           variant={ButtonVariant.SECONDARY}
           size={ButtonSize.LARGE}
           disabled={!secureStorageAvailable}
-          style={
-            !secureStorageAvailable
-              ? [styles.optionButton, styles.disabledButton]
-              : styles.optionButton
-          }
+          style={!secureStorageAvailable ? styles.disabledButton : undefined}
+        />
+
+        <GradientButton
+          title="Test Secure Storage"
+          onPress={handleTestSecureStorage}
+          variant={ButtonVariant.ACCENT}
+          size={ButtonSize.MEDIUM}
+        />
+
+        <GradientButton
+          title="Debug Storage"
+          onPress={debugStorage}
+          variant={ButtonVariant.ACCENT}
+          size={ButtonSize.MEDIUM}
         />
       </View>
 
       {showImportForm && (
         <GradientCard variant={CardVariant.OUTLINED} style={styles.importForm}>
-          <Text style={[styles.importLabel, { color: theme.text.SOFT_WHITE }]}>
+          <LabelMedium color={theme.text.SOFT_WHITE}>
             {LabelText.ENTER_PRIVATE_KEY}
-          </Text>
+          </LabelMedium>
           <TextInput
             style={[
               styles.privateKeyInput,
@@ -364,10 +329,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
   disconnectButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -376,38 +337,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 0, 0, 0.5)",
   },
-  disconnectText: {
-    color: "#ff4444",
-    fontWeight: "600",
-  },
   walletCard: {
     margin: 20,
   },
-  balanceLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
   balanceAmount: {
-    fontSize: 32,
-    fontWeight: "bold",
     marginBottom: 20,
   },
   addressContainer: {
     marginBottom: 20,
   },
-  addressLabel: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  addressText: {
-    fontSize: 16,
-    fontFamily: "monospace",
-  },
   refreshButton: {
     marginBottom: 12,
   },
+  exportButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
   exportButton: {
-    // Styles handled by GradientButton
+    flex: 1,
   },
   actionsContainer: {
     flexDirection: "row",
@@ -420,31 +367,15 @@ const styles = StyleSheet.create({
   welcomeCard: {
     margin: 20,
   },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
   optionsContainer: {
     paddingHorizontal: 20,
     gap: 16,
-  },
-  optionButton: {
-    // Styles handled by GradientButton
   },
   disabledButton: {
     opacity: 0.5,
   },
   importForm: {
     margin: 20,
-  },
-  importLabel: {
-    fontSize: 16,
-    marginBottom: 12,
   },
   privateKeyInput: {
     borderWidth: 1,
