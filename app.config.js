@@ -4,21 +4,21 @@ export default {
     slug: "blink",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/ios.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#0A0F1E",
     },
     ios: {
       supportsTablet: true,
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        foregroundImage: "./assets/android.png",
+        backgroundColor: "#0A0F1E",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
