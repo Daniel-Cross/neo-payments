@@ -39,3 +39,13 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# build files
+*.apk
+*.app
+*.tar.gz
+Blink.app/
+build-*.tar.gz
+**/Frameworks/
+**/*.framework/
+**/*.dylib
