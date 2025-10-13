@@ -29,13 +29,13 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true, // Require biometric authentication
           authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.BLINK_WALLET, // iOS keychain service name
+          keychainService: SecureStorageService.NEO_WALLET, // iOS keychain service name
         }
       );
 
       await SecureStore.setItemAsync(StorageKey.WALLET_PUBLIC_KEY, publicKey, {
         requireAuthentication: false, // Public key doesn't need auth
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
 
       return true;
@@ -55,7 +55,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         }
       );
 
@@ -81,7 +81,7 @@ export class SecureWalletStorage {
   static async getPublicKey(): Promise<string | null> {
     try {
       return await SecureStore.getItemAsync(StorageKey.WALLET_PUBLIC_KEY, {
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
     } catch (error) {
       console.error("Failed to retrieve public key:", error);
@@ -108,10 +108,10 @@ export class SecureWalletStorage {
   static async removeWallet(): Promise<boolean> {
     try {
       await SecureStore.deleteItemAsync(StorageKey.WALLET_PRIVATE_KEY, {
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
       await SecureStore.deleteItemAsync(StorageKey.WALLET_PUBLIC_KEY, {
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
       return true;
     } catch (error) {
@@ -131,7 +131,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.EXPORT_PRIVATE_KEY,
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         }
       );
 
@@ -173,13 +173,13 @@ export class SecureWalletStorage {
       await SecureStore.setItemAsync(testKey, testValue, {
         requireAuthentication: true,
         authenticationPrompt: "Test authentication",
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
 
       const retrievedValue = await SecureStore.getItemAsync(testKey, {
         requireAuthentication: true,
         authenticationPrompt: "Test authentication",
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
 
       await SecureStore.deleteItemAsync(testKey);
@@ -202,17 +202,17 @@ export class SecureWalletStorage {
 
       try {
         await SecureStore.setItemAsync(testKey, testValue, {
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         });
         const retrievedTest = await SecureStore.getItemAsync(testKey, {
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         });
         console.log(
           "Basic test result:",
           retrievedTest === testValue ? "PASS" : "FAIL"
         );
         await SecureStore.deleteItemAsync(testKey, {
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         });
       } catch (error) {
         console.log("Basic test failed:", error);
@@ -222,7 +222,7 @@ export class SecureWalletStorage {
       const publicKey = await SecureStore.getItemAsync(
         StorageKey.WALLET_PUBLIC_KEY,
         {
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         }
       );
       console.log("Public key stored:", publicKey ? "Yes" : "No");
@@ -235,7 +235,7 @@ export class SecureWalletStorage {
         const privateKeyNoAuth = await SecureStore.getItemAsync(
           StorageKey.WALLET_PRIVATE_KEY,
           {
-            keychainService: SecureStorageService.BLINK_WALLET,
+            keychainService: SecureStorageService.NEO_WALLET,
           }
         );
         console.log(
@@ -274,7 +274,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         }
       );
 
@@ -295,7 +295,7 @@ export class SecureWalletStorage {
         {
           requireAuthentication: true,
           authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.BLINK_WALLET,
+          keychainService: SecureStorageService.NEO_WALLET,
         }
       );
 
@@ -336,9 +336,19 @@ export class SecureWalletStorage {
    */
   static async removeWallets(): Promise<boolean> {
     try {
+      // Remove new multi-wallet data
       await SecureStore.deleteItemAsync(StorageKey.WALLETS_DATA, {
-        keychainService: SecureStorageService.BLINK_WALLET,
+        keychainService: SecureStorageService.NEO_WALLET,
       });
+
+      // Also remove old single wallet data to prevent migration on restart
+      await SecureStore.deleteItemAsync(StorageKey.WALLET_PRIVATE_KEY, {
+        keychainService: SecureStorageService.NEO_WALLET,
+      });
+      await SecureStore.deleteItemAsync(StorageKey.WALLET_PUBLIC_KEY, {
+        keychainService: SecureStorageService.NEO_WALLET,
+      });
+
       return true;
     } catch (error) {
       console.error("Failed to remove wallets from secure storage:", error);

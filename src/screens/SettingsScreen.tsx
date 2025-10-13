@@ -110,8 +110,8 @@ const SettingsScreen = () => {
               value={item.value}
               onValueChange={item.onToggle}
               trackColor={{
-                false: theme.background.NAVY_LIGHTER,
-                true: theme.colors.PRIMARY_GREEN,
+                false: theme.background.PURPLE_LIGHTER,
+                true: theme.colors.ELECTRIC_BLUE,
               }}
               thumbColor={item.value ? "#fff" : "#f4f3f4"}
             />
@@ -156,7 +156,7 @@ const SettingsScreen = () => {
           Settings
         </Text>
         <Text style={[styles.subtitle, { color: theme.text.LIGHT_GREY }]}>
-          Customize your Blink experience
+          Customize your Neo experience
         </Text>
       </View>
 

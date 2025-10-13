@@ -3,51 +3,53 @@ const BUILD_NUMBER = Math.floor(Date.now() / 1000).toString();
 
 export default {
   expo: {
-    name: "Blink",
-    slug: "blink",
+    name: "Neo",
+    slug: "neo",
+    owner: "daniel.cross",
     version: pkgs.version,
     orientation: "portrait",
-    icon: "./assets/ios.png",
-    userInterfaceStyle: "light",
+    icon: "./assets/images/ios.png",
+    userInterfaceStyle: "dark",
     newArchEnabled: true,
     jsEngine: "hermes",
 
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#0A0F1E",
+      backgroundColor: "#2B003B",
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.daniel.cross.blink",
+      bundleIdentifier: "com.appforge.neo",
       buildNumber: BUILD_NUMBER,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
-          "Blink uses Face ID to securely protect your wallet private keys and authenticate sensitive operations.",
+          "Neo uses Face ID to securely protect your wallet private keys and authenticate sensitive operations.",
       },
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/android.png",
-        backgroundColor: "#0A0F1E",
+        foregroundImage: "./assets/images/android.png",
+        backgroundColor: "#2B003B",
         versionCode: parseInt(BUILD_NUMBER, 10),
-        package: "com.daniel.cross.blink",
+        package: "com.appforge.neo",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       permissions: ["USE_BIOMETRIC", "USE_FINGERPRINT"],
     },
     web: {
-      favicon: "./assets/favicon.png",
+      favicon: "./assets/images/favicon.png",
     },
     extra: {
       eas: {
-        projectId: "2ed7c203-a8af-4b0d-966d-7b36de74068f",
+        projectId: "ce6d91f4-c1ae-4e40-ad45-b187b5ec5d6f",
       },
     },
     plugins: [
       "expo-build-properties",
+      "expo-font",
       [
         "expo-router",
         {
@@ -55,6 +57,6 @@ export default {
         },
       ],
     ],
-    scheme: "blink",
+    scheme: "neo",
   },
 };

@@ -104,9 +104,9 @@ const ImportWalletScreen = () => {
             style={[
               styles.textInput,
               {
-                backgroundColor: theme.background.NAVY_LIGHTER,
+                backgroundColor: theme.background.PURPLE_LIGHTER,
                 color: theme.text.SOFT_WHITE,
-                borderColor: theme.background.NAVY_ACCENT,
+                borderColor: theme.background.PURPLE_HOVER,
               },
             ]}
             value={inputText}

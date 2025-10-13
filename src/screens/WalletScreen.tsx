@@ -50,7 +50,6 @@ export default function WalletScreen() {
     isLoading,
     createNewWallet,
     importWallet,
-    loadWallets,
     disconnectWallet,
     updateBalance,
     exportPrivateKey,
@@ -63,19 +62,15 @@ export default function WalletScreen() {
   const [showImportForm, setShowImportForm] = useState(false);
   const [secureStorageAvailable, setSecureStorageAvailable] = useState(true);
 
-  // Check secure storage availability and load wallet on mount
+  // Check secure storage availability on mount
   useEffect(() => {
     const initializeWallet = async () => {
       const isAvailable = await checkSecureStorage();
       setSecureStorageAvailable(isAvailable);
-
-      if (isAvailable) {
-        await loadWallets();
-      }
     };
 
     initializeWallet();
-  }, [checkSecureStorage, loadWallets]);
+  }, [checkSecureStorage]);
 
   // Update balance when wallet is connected
   useEffect(() => {
@@ -143,7 +138,7 @@ export default function WalletScreen() {
           </LabelMedium>
           <Typography
             variant={TypographyVariant.DISPLAY_MEDIUM}
-            color={theme.colors.PRIMARY_GREEN}
+            color={theme.colors.ELECTRIC_BLUE}
             weight="700"
             style={styles.balanceAmount}
           >
@@ -219,7 +214,7 @@ export default function WalletScreen() {
 
       <GradientCard variant={CardVariant.ELEVATED} style={styles.welcomeCard}>
         <HeadlineSmall color={theme.text.SOFT_WHITE}>
-          {ScreenTitle.WELCOME_TO_BLINK}
+          {ScreenTitle.WELCOME_TO_NEO}
         </HeadlineSmall>
         <BodyMedium color={theme.text.LIGHT_GREY}>
           {LabelText.WELCOME_SUBTITLE}
@@ -263,7 +258,7 @@ export default function WalletScreen() {
             style={[
               styles.privateKeyInput,
               {
-                backgroundColor: theme.background.NAVY_LIGHT,
+                backgroundColor: theme.background.PURPLE_ACCENT,
                 borderColor: "rgba(255, 255, 255, 0.2)",
                 color: theme.text.SOFT_WHITE,
               },

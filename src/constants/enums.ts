@@ -39,8 +39,6 @@ export enum Route {
 export enum ButtonVariant {
   PRIMARY = "primary",
   SECONDARY = "secondary",
-  ACCENT = "accent",
-  NAVY = "navy",
 }
 
 export enum ButtonSize {
@@ -78,16 +76,16 @@ export enum TransactionStatus {
 
 // Storage and security enums
 export enum StorageKey {
-  WALLET_PRIVATE_KEY = "blink_wallet_private_key",
-  WALLET_PUBLIC_KEY = "blink_wallet_public_key",
-  WALLETS_DATA = "blink_wallets_data",
-  TEST_KEY = "blink_test_key",
-  TEST_AUTH_KEY = "blink_test_auth_key",
-  DEBUG_TEST_KEY = "blink_debug_test_key",
+  WALLET_PRIVATE_KEY = "neo_wallet_private_key",
+  WALLET_PUBLIC_KEY = "neo_wallet_public_key",
+  WALLETS_DATA = "neo_wallets_data",
+  TEST_KEY = "neo_test_key",
+  TEST_AUTH_KEY = "neo_test_auth_key",
+  DEBUG_TEST_KEY = "neo_debug_test_key",
 }
 
 export enum SecureStorageService {
-  BLINK_WALLET = "blink-wallet",
+  NEO_WALLET = "neo-wallet",
 }
 
 // UI text enums
@@ -133,7 +131,7 @@ export enum ButtonText {
 export enum ScreenTitle {
   MY_WALLET = "My Wallet",
   CONNECT_WALLET = "Connect Wallet",
-  WELCOME_TO_BLINK = "Welcome to Blink",
+  WELCOME_TO_NEO = "Welcome to Neo",
 }
 
 export enum PlaceholderText {

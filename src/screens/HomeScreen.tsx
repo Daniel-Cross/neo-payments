@@ -89,7 +89,7 @@ const HomeScreen = () => {
                 {formatPublicKey(publicKey)}
               </Text>
               <Text
-                style={[styles.copyText, { color: theme.colors.PRIMARY_GREEN }]}
+                style={[styles.copyText, { color: theme.colors.ELECTRIC_BLUE }]}
               >
                 Tap to copy
               </Text>
@@ -113,7 +113,7 @@ const HomeScreen = () => {
             <GradientButton
               title="Receive SOL"
               onPress={() => {}}
-              variant={ButtonVariant.NAVY}
+              variant={ButtonVariant.SECONDARY}
               style={styles.button}
             />
           </View>

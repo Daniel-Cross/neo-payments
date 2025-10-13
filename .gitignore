@@ -44,7 +44,7 @@ yarn-error.*
 *.apk
 *.app
 *.tar.gz
-Blink.app/
+Neo.app/
 build-*.tar.gz
 **/Frameworks/
 **/*.framework/

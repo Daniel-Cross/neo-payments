@@ -11,11 +11,11 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.background.NAVY,
-          borderTopColor: theme.background.NAVY,
+          backgroundColor: theme.background.DARK_PURPLE,
+          borderTopColor: theme.background.DARK_PURPLE,
           height: 80,
         },
-        tabBarActiveTintColor: theme.colors.PRIMARY_GREEN_DARK,
+        tabBarActiveTintColor: theme.colors.ELECTRIC_BLUE,
         tabBarInactiveTintColor: theme.text.LIGHT_GREY,
         tabBarLabelStyle: {
           fontSize: 12,
@@ -74,7 +74,7 @@ function TabIcon({
   size: number;
 }) {
   const { theme } = useTheme();
-  const isActive = color === theme.colors.PRIMARY_GREEN_DARK;
+  const isActive = color === theme.colors.ELECTRIC_BLUE;
 
   const getIcon = () => {
     switch (name) {

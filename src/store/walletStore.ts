@@ -406,6 +406,10 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         set({
           wallets: [],
           selectedWalletId: null,
+          selectedWallet: null,
+          publicKey: null,
+          balance: 0,
+          keypair: null,
           isConnected: false,
           isLoading: false,
         });
@@ -414,19 +418,12 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
       // Select the first wallet by default
       const selectedWalletId = wallets[0].id;
-      console.log(
-        "loadWallets setting selectedWalletId:",
-        selectedWalletId,
-        "from wallet:",
-        wallets[0].name
-      );
-
       const selectedWallet = wallets[0];
-      console.log("About to set state with:", {
-        wallets: wallets.length,
-        selectedWalletId,
-        isConnected: true,
-      });
+      console.log(
+        "🔍 Setting connected state - found",
+        wallets.length,
+        "wallets"
+      );
       set({
         wallets,
         selectedWalletId,
@@ -437,7 +434,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         isConnected: true,
         isLoading: false,
       });
-      console.log("State set complete");
 
       return true;
     } catch (error) {
@@ -452,6 +448,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     set({ isLoading: true });
     try {
       await SecureWalletStorage.removeWallets();
+
       set({
         wallets: [],
         selectedWalletId: null,

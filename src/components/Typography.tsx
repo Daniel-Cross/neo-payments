@@ -2,8 +2,17 @@ import { Text, TextProps, TextStyle } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { TypographyVariant, TypographyAlign } from "../constants/enums";
 import {
-  getTypographyStyle,
-  createTypographyStyle,
+  HEADER_TEXT,
+  SUB_HEADER_TEXT,
+  BUTTON_TEXT,
+  BODY_TEXT,
+  SMALL_TEXT,
+  FONT_SIZE_32,
+  FONT_SIZE_28,
+  FONT_SIZE_24,
+  FONT_SIZE_18,
+  FONT_SIZE_16,
+  FONT_SIZE_14,
 } from "../constants/typography";
 
 interface TypographyProps extends Omit<TextProps, "style"> {
@@ -32,18 +41,101 @@ export const Typography = ({
 }: TypographyProps) => {
   const { theme } = useTheme();
 
-  // Get base typography style
-  const baseStyle = getTypographyStyle(variant);
+  // Get base typography style based on variant
+  const getBaseStyle = () => {
+    switch (variant) {
+      case TypographyVariant.DISPLAY_LARGE:
+        return {
+          fontFamily: "KanitBold",
+          fontSize: FONT_SIZE_32,
+          lineHeight: FONT_SIZE_32 * 1.2,
+          fontWeight: "bold" as const,
+        };
+      case TypographyVariant.DISPLAY_MEDIUM:
+        return {
+          fontFamily: "KanitBold",
+          fontSize: FONT_SIZE_28,
+          lineHeight: FONT_SIZE_28 * 1.2,
+          fontWeight: "bold" as const,
+        };
+      case TypographyVariant.DISPLAY_SMALL:
+        return {
+          fontFamily: "KanitBold",
+          fontSize: FONT_SIZE_24,
+          lineHeight: FONT_SIZE_24 * 1.2,
+          fontWeight: "bold" as const,
+        };
+      case TypographyVariant.HEADLINE_LARGE:
+        return HEADER_TEXT.font;
+      case TypographyVariant.HEADLINE_MEDIUM:
+        return SUB_HEADER_TEXT.font;
+      case TypographyVariant.HEADLINE_SMALL:
+        return {
+          fontFamily: "KanitBold",
+          fontSize: FONT_SIZE_16,
+          lineHeight: FONT_SIZE_16 * 1.3,
+          fontWeight: "bold" as const,
+        };
+      case TypographyVariant.TITLE_LARGE:
+        return {
+          fontFamily: "KanitBold",
+          fontSize: FONT_SIZE_18,
+          lineHeight: FONT_SIZE_18 * 1.3,
+          fontWeight: "bold" as const,
+        };
+      case TypographyVariant.TITLE_MEDIUM:
+        return {
+          fontFamily: "Kanit",
+          fontSize: FONT_SIZE_16,
+          lineHeight: FONT_SIZE_16 * 1.3,
+          fontWeight: "600" as const,
+        };
+      case TypographyVariant.TITLE_SMALL:
+        return {
+          fontFamily: "Kanit",
+          fontSize: FONT_SIZE_14,
+          lineHeight: FONT_SIZE_14 * 1.3,
+          fontWeight: "600" as const,
+        };
+      case TypographyVariant.BODY_LARGE:
+        return {
+          ...BODY_TEXT,
+          fontSize: FONT_SIZE_18,
+        };
+      case TypographyVariant.BODY_MEDIUM:
+        return BODY_TEXT;
+      case TypographyVariant.BODY_SMALL:
+        return {
+          ...BODY_TEXT,
+          fontSize: FONT_SIZE_14,
+        };
+      case TypographyVariant.LABEL_LARGE:
+        return BUTTON_TEXT;
+      case TypographyVariant.LABEL_MEDIUM:
+        return {
+          fontFamily: "Kanit",
+          fontSize: FONT_SIZE_14,
+          lineHeight: FONT_SIZE_14 * 1.2,
+          fontWeight: "600" as const,
+        };
+      case TypographyVariant.LABEL_SMALL:
+        return SMALL_TEXT.font;
+      default:
+        return BODY_TEXT;
+    }
+  };
+
+  const baseStyle = getBaseStyle();
 
   // Create custom style with overrides
-  const customStyle = createTypographyStyle(variant, {
+  const customStyle = {
     color: color || theme.text.SOFT_WHITE,
     textAlign,
     fontWeight: weight as any,
     fontSize: size,
     lineHeight,
     letterSpacing,
-  });
+  };
 
   return (
     <Text

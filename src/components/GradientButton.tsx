@@ -1,14 +1,20 @@
 import {
   TouchableOpacity,
-  Text,
   StyleSheet,
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../contexts/ThemeContext";
-import { ButtonVariant, ButtonSize } from "../constants/enums";
+import { Typography } from "./Typography";
+import {
+  ButtonVariant,
+  ButtonSize,
+  TypographyVariant,
+} from "../constants/enums";
+import { TEXT } from "../constants/colours";
 
 interface GradientButtonProps {
   title: string;
@@ -39,10 +45,6 @@ export const GradientButton = ({
         return theme.gradients.BUTTON_PRIMARY;
       case ButtonVariant.SECONDARY:
         return theme.gradients.BUTTON_SECONDARY;
-      case ButtonVariant.ACCENT:
-        return theme.gradients.ACCENT;
-      case ButtonVariant.NAVY:
-        return theme.gradients.BUTTON_NAVY;
       default:
         return theme.gradients.BUTTON_PRIMARY;
     }
@@ -74,15 +76,11 @@ export const GradientButton = ({
   const getTextColor = () => {
     switch (variant) {
       case ButtonVariant.PRIMARY:
-        return "#000";
+        return TEXT.SOFT_WHITE;
       case ButtonVariant.SECONDARY:
         return theme.text.SOFT_WHITE;
-      case ButtonVariant.ACCENT:
-        return theme.text.SOFT_WHITE;
-      case ButtonVariant.NAVY:
-        return theme.text.SOFT_WHITE;
       default:
-        return "#000";
+        return TEXT.SOFT_WHITE;
     }
   };
 
@@ -90,6 +88,41 @@ export const GradientButton = ({
   const sizeStyles = getSizeStyles();
   const textColor = getTextColor();
 
+  // For secondary buttons, use outline style instead of gradient
+  if (variant === ButtonVariant.SECONDARY) {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        style={[style]}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[
+            styles.button,
+            styles.outlineButton,
+            sizeStyles,
+            { borderColor: theme.colors.ELECTRIC_BLUE },
+            disabled && styles.disabled,
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator color={textColor} size="small" />
+          ) : (
+            <Typography
+              variant={TypographyVariant.LABEL_LARGE}
+              color={textColor}
+              style={textStyle}
+            >
+              {title}
+            </Typography>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // For primary buttons, use gradient
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -106,9 +139,13 @@ export const GradientButton = ({
         {loading ? (
           <ActivityIndicator color={textColor} size="small" />
         ) : (
-          <Text style={[styles.text, { color: textColor }, textStyle]}>
+          <Typography
+            variant={TypographyVariant.LABEL_LARGE}
+            color={textColor}
+            style={textStyle}
+          >
             {title}
-          </Text>
+          </Typography>
         )}
       </LinearGradient>
     </TouchableOpacity>
@@ -120,11 +157,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    borderRadius: 8,
+    // Add padding to match border width of outline buttons
+    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
-  text: {
-    fontSize: 16,
-    fontWeight: "bold",
+  outlineButton: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    // Remove padding since border takes up the space
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
+  // Typography component handles font styling
   disabled: {
     opacity: 0.5,
   },

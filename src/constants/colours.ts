@@ -1,79 +1,69 @@
-// Primary brand colors
+// New Electric Theme - Primary brand colors
 export const COLORS = {
-  PRIMARY_GREEN: "#2DA82D",
-  PRIMARY_GREEN_DARK: "#00CC00",
-  PRIMARY_GREEN_LIGHT: "#33FF33",
-  ACCENT_BLUE: "#0066FF",
-  ACCENT_PURPLE: "#6600FF",
+  ELECTRIC_BLUE: "#00E5FF",
+  NEON_PINK: "#FF007F",
+  VIBRANT_PURPLE: "#9B00FF",
+  WHITE: "#F5F5F5",
+  BLACK: "#101012",
 };
 
-// Background colors - Navy-based dark mode
+// Background colors - Electric Purple Theme
 export const BACKGROUND = {
-  NAVY: "#0A0F1E", // Main app background (solid navy)
-  NAVY_LIGHT: "#1A2332", // Lighter navy for cards
-  NAVY_LIGHTER: "#2A3441", // Even lighter navy for buttons and interactive elements
-  NAVY_ACCENT: "#3A4451", // Accent navy for hover states
+  DARK_PURPLE: "#2B003B", // Main app background
+  PURPLE_ACCENT: "#4C006B", // Lighter purple for cards
+  PURPLE_LIGHTER: "#6B009B", // Even lighter purple for buttons
+  PURPLE_HOVER: "#8B00CB", // Hover states
   OVERLAY: "rgba(0, 0, 0, 0.5)",
 };
 
 // Text colors
 export const TEXT = {
-  SOFT_WHITE: "#EAEAEA",
-  LIGHT_GREY: "#C8C8C8",
-  LIGHT_WHITE: "#F5F7FA",
-  DARK_GREY: "#888888",
-  ERROR_RED: "#FF4444",
-  SUCCESS_GREEN: "#00FF00",
-  WARNING_ORANGE: "#FF8800",
+  SOFT_WHITE: "#F5F5F5",
+  LIGHT_GREY: "#C4C4C8",
+  LIGHT_WHITE: "#FFFFFF",
+  DARK_GREY: "#727277",
+  ERROR_RED: "#FF737D",
+  SUCCESS_GREEN: "#00C589",
+  WARNING_ORANGE: "#FFE082",
 };
 
 // Status colors
 export const STATUS = {
-  SUCCESS: "#00FF00",
-  ERROR: "#FF4444",
-  WARNING: "#FF8800",
-  INFO: "#0066FF",
+  SUCCESS: "#00C589",
+  ERROR: "#FF737D",
+  WARNING: "#FFE082",
+  INFO: "#00E5FF",
 };
 
 // Toast colors
 export const TOAST = {
-  SUCCESS: COLORS.PRIMARY_GREEN,
-  ERROR: "#FF4444",
-  WARNING: "#FF8800",
-  INFO: COLORS.ACCENT_BLUE,
+  SUCCESS: "#00C589",
+  ERROR: "#FF737D",
+  WARNING: "#FFE082",
+  INFO: "#00E5FF",
 };
 
-// Gradient definitions - Navy-based gradients
+// Gradient definitions - Electric Theme
 export const GRADIENTS = {
   PRIMARY: {
-    colors: [BACKGROUND.NAVY, BACKGROUND.NAVY], // Solid navy background
+    colors: [BACKGROUND.DARK_PURPLE, BACKGROUND.DARK_PURPLE], // Solid purple background
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
   CARD: {
-    colors: [BACKGROUND.NAVY_LIGHT, BACKGROUND.NAVY_LIGHT], // Solid lighter navy for cards
+    colors: [BACKGROUND.PURPLE_ACCENT, BACKGROUND.PURPLE_ACCENT], // Solid purple accent for cards
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
   BUTTON_PRIMARY: {
-    colors: [COLORS.PRIMARY_GREEN, COLORS.PRIMARY_GREEN_DARK],
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: 1 },
-  },
-  BUTTON_SECONDARY: {
-    colors: [BACKGROUND.NAVY_LIGHTER, BACKGROUND.NAVY_LIGHTER], // Solid lighter navy for secondary buttons
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: 1 },
-  },
-  BUTTON_NAVY: {
-    colors: [BACKGROUND.NAVY_LIGHTER, BACKGROUND.NAVY_ACCENT], // Subtle navy gradient for navy buttons
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: 1 },
-  },
-  ACCENT: {
-    colors: [COLORS.ACCENT_BLUE, COLORS.ACCENT_PURPLE],
+    colors: [COLORS.NEON_PINK, COLORS.VIBRANT_PURPLE],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
+  },
+  BUTTON_SECONDARY: {
+    colors: ["transparent", "transparent"], // Transparent for outline secondary buttons
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: 1 },
   },
 };
 
