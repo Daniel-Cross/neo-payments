@@ -192,65 +192,6 @@ export class SecureWalletStorage {
   }
 
   /**
-   * Debug function to check what's stored in secure storage
-   */
-  static async debugStorage(): Promise<void> {
-    try {
-      // Test basic storage/retrieval with keychain service
-      const testKey = StorageKey.DEBUG_TEST_KEY;
-      const testValue = "debug_test_value";
-
-      try {
-        await SecureStore.setItemAsync(testKey, testValue, {
-          keychainService: SecureStorageService.NEO_WALLET,
-        });
-        const retrievedTest = await SecureStore.getItemAsync(testKey, {
-          keychainService: SecureStorageService.NEO_WALLET,
-        });
-        console.log(
-          "Basic test result:",
-          retrievedTest === testValue ? "PASS" : "FAIL"
-        );
-        await SecureStore.deleteItemAsync(testKey, {
-          keychainService: SecureStorageService.NEO_WALLET,
-        });
-      } catch (error) {
-        console.log("Basic test failed:", error);
-      }
-
-      // Check public key
-      const publicKey = await SecureStore.getItemAsync(
-        StorageKey.WALLET_PUBLIC_KEY,
-        {
-          keychainService: SecureStorageService.NEO_WALLET,
-        }
-      );
-      console.log("Public key stored:", publicKey ? "Yes" : "No");
-      if (publicKey) {
-        console.log("Public key value:", publicKey);
-      }
-
-      // Check if private key exists (without auth for debugging)
-      try {
-        const privateKeyNoAuth = await SecureStore.getItemAsync(
-          StorageKey.WALLET_PRIVATE_KEY,
-          {
-            keychainService: SecureStorageService.NEO_WALLET,
-          }
-        );
-        console.log(
-          "Private key exists (no auth):",
-          privateKeyNoAuth ? "Yes" : "No"
-        );
-      } catch (error) {
-        console.log("Private key requires authentication (expected)");
-      }
-    } catch (error) {
-      console.error("Debug storage failed:", error);
-    }
-  }
-
-  /**
    * Store multiple wallets securely
    */
   static async storeWallets(wallets: Wallet[]): Promise<boolean> {

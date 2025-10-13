@@ -68,7 +68,6 @@ function AppNavigator() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" />
       <Stack.Screen name="create-wallet" />
       <Stack.Screen name="import-wallet" />
     </Stack>

@@ -1,19 +1,43 @@
-import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, Image } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
-import { GradientCard } from "./GradientCard";
-import { GradientButton } from "./GradientButton";
 import { Typography } from "./Typography";
-import { ButtonVariant, TypographyVariant } from "../constants/enums";
+import { GradientButton } from "./GradientButton";
+import { TypographyVariant, ButtonVariant } from "../constants/enums";
 import { useWalletStore } from "../store/walletStore";
 import { useEffect } from "react";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { EDGE_MARGIN } from "../constants/styles";
+
+// Helper function to get currency symbol
+const getCurrencySymbol = (currency: string): string => {
+  const symbols: { [key: string]: string } = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    JPY: "¥",
+    CAD: "C$",
+    AUD: "A$",
+    CHF: "CHF",
+    CNY: "¥",
+    INR: "₹",
+    KRW: "₩",
+    BRL: "R$",
+    RUB: "₽",
+    MXN: "$",
+    ZAR: "R",
+  };
+  return symbols[currency] || currency + " ";
+};
 
 const WalletContent = () => {
   const { theme } = useTheme();
   const {
     publicKey,
     balance,
+    fiatValue,
+    selectedCurrency,
     updateBalance,
+    updateSolPrice,
     isLoading,
     wallets,
     selectedWallet,
@@ -21,10 +45,14 @@ const WalletContent = () => {
   } = useWalletStore();
 
   useEffect(() => {
-    // Update balance when component mounts
-    updateBalance();
+    // Update balance and price when component mounts
+    if (isConnected && selectedWallet) {
+      updateBalance();
+      updateSolPrice();
+    }
   }, [
     updateBalance,
+    updateSolPrice,
     wallets,
     selectedWallet,
     publicKey,
@@ -37,172 +65,109 @@ const WalletContent = () => {
     return `${key.slice(0, 7)}...${key.slice(-7)}`;
   };
 
-  const copyToClipboard = (text: string) => {
-    // TODO: Implement clipboard functionality
-    console.log("Copy to clipboard:", text);
+  const handleSend = () => {
+    // TODO: Navigate to send screen
+    console.log("Send button pressed");
+  };
+
+  const handleScan = () => {
+    // TODO: Open QR scanner
+    console.log("Scan button pressed");
   };
 
   return (
     <View style={styles.container}>
-      {/* Wallet Header */}
-      <GradientCard style={styles.walletHeader}>
-        <View style={styles.walletInfo}>
-          <Typography
-            variant={TypographyVariant.HEADLINE_MEDIUM}
-            color={theme.text.SOFT_WHITE}
-            style={styles.walletTitle}
-          >
-            Your Wallet
-          </Typography>
-          <Typography
-            variant={TypographyVariant.DISPLAY_SMALL}
-            color={theme.text.SOFT_WHITE}
-            style={styles.balance}
-          >
-            {balance.toFixed(4)} SOL
-          </Typography>
-        </View>
-
-        <View style={styles.publicKeyContainer}>
-          <Typography
-            variant={TypographyVariant.LABEL_MEDIUM}
-            color={theme.text.LIGHT_GREY}
-            style={styles.publicKeyLabel}
-          >
-            Public Key
-          </Typography>
-          <View style={styles.publicKeyRow}>
-            <Typography
-              variant={TypographyVariant.BODY_MEDIUM}
-              color={theme.text.SOFT_WHITE}
-              style={styles.publicKey}
-            >
-              {formatPublicKey(publicKey)}
-            </Typography>
-            <TouchableOpacity
-              onPress={() => copyToClipboard(publicKey || "")}
-              style={styles.copyButton}
-            >
-              <Typography
-                variant={TypographyVariant.LABEL_SMALL}
-                color={theme.colors.ELECTRIC_BLUE}
-                style={styles.copyText}
-              >
-                Tap to copy
-              </Typography>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </GradientCard>
-
-      {/* Action Buttons */}
-      <GradientCard style={styles.actionsCard}>
+      {/* Wallet info in top left */}
+      <View>
         <Typography
-          variant={TypographyVariant.TITLE_LARGE}
+          variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.SOFT_WHITE}
-          style={styles.actionsTitle}
         >
-          Quick Actions
+          Test Account
         </Typography>
-
-        <View style={styles.buttonContainer}>
-          <GradientButton
-            title="Send SOL"
-            onPress={() => {}}
-            variant={ButtonVariant.PRIMARY}
-            style={styles.button}
-          />
-          <GradientButton
-            title="Receive SOL"
-            onPress={() => {}}
-            variant={ButtonVariant.SECONDARY}
-            style={styles.button}
-          />
-        </View>
-      </GradientCard>
-
-      {/* Recent Activity */}
-      <GradientCard style={styles.activityCard}>
         <Typography
-          variant={TypographyVariant.TITLE_LARGE}
+          variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.SOFT_WHITE}
-          style={styles.activityTitle}
         >
-          Recent Activity
+          +46 000 00 00 00
+        </Typography>
+        <Typography
+          variant={TypographyVariant.BODY_MEDIUM}
+          color={theme.text.SOFT_WHITE}
+        >
+          {formatPublicKey(publicKey)}
+        </Typography>
+        <Typography
+          variant={TypographyVariant.HEADLINE_MEDIUM}
+          color={theme.text.SOFT_WHITE}
+        >
+          {balance.toFixed(4)} SOL
         </Typography>
         <Typography
           variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.LIGHT_GREY}
-          style={styles.activityPlaceholder}
         >
-          No recent transactions
+          {getCurrencySymbol(selectedCurrency)}
+          {fiatValue.toFixed(2)} {selectedCurrency}
         </Typography>
-      </GradientCard>
+      </View>
+
+      {/* Centered rocket image */}
+      <View style={styles.rocketContainer}>
+        <Image
+          source={require("../../assets/images/rocket.png")}
+          style={styles.rocket}
+        />
+      </View>
+
+      {/* Buttons at bottom */}
+      <View style={styles.buttonContainer}>
+        <GradientButton
+          title="Send"
+          onPress={handleSend}
+          variant={ButtonVariant.PRIMARY}
+          style={styles.button}
+        />
+        <GradientButton
+          title="Scan"
+          onPress={handleScan}
+          variant={ButtonVariant.SECONDARY}
+          style={styles.button}
+          icon={
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={20}
+              color={theme.text.SOFT_WHITE}
+            />
+          }
+        />
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    paddingTop: 60,
-  },
-  walletHeader: {
-    marginBottom: 20,
-  },
-  walletInfo: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  walletTitle: {
-    marginBottom: 8,
-  },
-  balance: {
-    // Typography component handles styling
-  },
-  publicKeyContainer: {
-    marginTop: 10,
-  },
-  publicKeyLabel: {
-    marginBottom: 8,
-  },
-  publicKeyRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  publicKey: {
     flex: 1,
+    paddingHorizontal: EDGE_MARGIN,
+    justifyContent: "space-between",
   },
-  copyButton: {
-    // No additional styling needed
+  rocketContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  copyText: {
-    // Typography component handles styling
-  },
-  actionsCard: {
-    marginBottom: 20,
-  },
-  actionsTitle: {
-    marginBottom: 16,
+  rocket: {
+    width: 300,
+    height: 300,
   },
   buttonContainer: {
     flexDirection: "row",
     gap: 12,
+    paddingBottom: EDGE_MARGIN,
   },
   button: {
     flex: 1,
-  },
-  activityCard: {
-    marginBottom: 20,
-  },
-  activityTitle: {
-    marginBottom: 12,
-  },
-  activityPlaceholder: {
-    textAlign: "center",
-    fontStyle: "italic",
   },
 });
 

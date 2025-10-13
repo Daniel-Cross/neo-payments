@@ -80,7 +80,6 @@ export enum StorageKey {
   WALLETS_DATA = "neo_wallets_data",
   TEST_KEY = "neo_test_key",
   TEST_AUTH_KEY = "neo_test_auth_key",
-  DEBUG_TEST_KEY = "neo_debug_test_key",
 }
 
 export enum SecureStorageService {

@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, ScrollView } from "react-native";
+import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWalletStore } from "../store/walletStore";
 import { GradientBackground } from "../components/GradientBackground";
@@ -16,12 +16,7 @@ const HomeScreen = () => {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {isConnected ? <WalletContent /> : <OnboardingContent />}
-        </ScrollView>
+        {isConnected ? <WalletContent /> : <OnboardingContent />}
       </SafeAreaView>
     </GradientBackground>
   );
@@ -33,9 +28,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
 });
 

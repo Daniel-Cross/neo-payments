@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   View,
 } from "react-native";
+import { ReactNode } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../contexts/ThemeContext";
 import { Typography } from "./Typography";
@@ -15,6 +16,7 @@ import {
   TypographyVariant,
 } from "../constants/enums";
 import { TEXT } from "../constants/colours";
+import { BASE_MARGIN } from "../constants/styles";
 
 interface GradientButtonProps {
   title: string;
@@ -25,6 +27,7 @@ interface GradientButtonProps {
   loading?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  icon?: ReactNode;
 }
 
 export const GradientButton = ({
@@ -36,6 +39,7 @@ export const GradientButton = ({
   loading = false,
   style,
   textStyle,
+  icon,
 }: GradientButtonProps) => {
   const { theme } = useTheme();
 
@@ -109,13 +113,16 @@ export const GradientButton = ({
           {loading ? (
             <ActivityIndicator color={textColor} size="small" />
           ) : (
-            <Typography
-              variant={TypographyVariant.LABEL_LARGE}
-              color={textColor}
-              style={textStyle}
-            >
-              {title}
-            </Typography>
+            <View style={styles.buttonContent}>
+              <Typography
+                variant={TypographyVariant.LABEL_LARGE}
+                color={textColor}
+                style={textStyle}
+              >
+                {title}
+              </Typography>
+              {icon && <View style={styles.iconContainer}>{icon}</View>}
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -139,13 +146,16 @@ export const GradientButton = ({
         {loading ? (
           <ActivityIndicator color={textColor} size="small" />
         ) : (
-          <Typography
-            variant={TypographyVariant.LABEL_LARGE}
-            color={textColor}
-            style={textStyle}
-          >
-            {title}
-          </Typography>
+          <View style={styles.buttonContent}>
+            {icon && <View style={styles.iconContainer}>{icon}</View>}
+            <Typography
+              variant={TypographyVariant.LABEL_LARGE}
+              color={textColor}
+              style={textStyle}
+            >
+              {title}
+            </Typography>
+          </View>
         )}
       </LinearGradient>
     </TouchableOpacity>
@@ -158,6 +168,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     borderRadius: 8,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconContainer: {
+    marginLeft: BASE_MARGIN,
   },
   outlineButton: {
     backgroundColor: "transparent",

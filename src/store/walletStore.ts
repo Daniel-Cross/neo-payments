@@ -4,6 +4,7 @@ import bs58 from "bs58";
 import * as bip39 from "bip39";
 import { SecureWalletStorage } from "../utils/secureStorage";
 import { SolanaNetwork, ConnectionCommitment } from "../constants/enums";
+import { priceService } from "../utils/priceService";
 
 // Solana mainnet connection
 const connection = new Connection(
@@ -28,10 +29,17 @@ export interface WalletState {
   isLoading: boolean;
   lastBalanceUpdate: number;
 
+  // Price data
+  solPrice: number;
+  priceLastUpdated: number;
+  isPriceLoading: boolean;
+  selectedCurrency: string; // Currency code (e.g., 'USD', 'EUR', 'GBP', 'JPY')
+
   // Computed properties
   selectedWallet: Wallet | null;
   publicKey: string | null;
   balance: number;
+  fiatValue: number;
   keypair: Keypair | null;
 
   // Actions
@@ -47,11 +55,12 @@ export interface WalletState {
   loadWallets: () => Promise<boolean>;
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
+  updateSolPrice: () => Promise<void>;
+  setCurrency: (currency: string) => void;
   exportPrivateKey: () => Promise<string | null>;
   exportSeedPhrase: () => Promise<string | null>;
   checkSecureStorage: () => Promise<boolean>;
   testSecureStorage: () => Promise<{ basicTest: boolean; authTest: boolean }>;
-  debugStorage: () => Promise<void>;
 }
 
 // Helper function to generate wallet name
@@ -80,10 +89,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   isLoading: false,
   lastBalanceUpdate: 0,
 
+  // Price data
+  solPrice: 100, // Default fallback price
+  priceLastUpdated: 0,
+  isPriceLoading: false,
+  selectedCurrency: "USD", // Default to USD
+
   // Computed properties
   selectedWallet: null as Wallet | null,
   publicKey: null as string | null,
   balance: 0,
+  fiatValue: 0,
   keypair: null as Keypair | null,
 
   // Create a new wallet
@@ -378,16 +394,11 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     try {
       // First try to load multiple wallets
       let wallets = await SecureWalletStorage.getWallets();
-      console.log("🔍 Loaded wallets from storage:", wallets?.length || 0);
 
       // If no wallets found, try to migrate from old single wallet format
       if (!wallets || wallets.length === 0) {
-        console.log(
-          "🔍 No wallets found, checking for old single wallet format"
-        );
         const oldKeypair = await SecureWalletStorage.getWallet();
         if (oldKeypair) {
-          console.log("🔍 Found old wallet, migrating to new format");
           // Migrate old single wallet to new multi-wallet format
           const publicKey = oldKeypair.publicKey.toString();
           const migratedWallet: Wallet = {
@@ -405,7 +416,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           await SecureWalletStorage.storeWallets(wallets);
           await SecureWalletStorage.removeWallet();
         } else {
-          console.log("🔍 No old wallet found either");
         }
       }
 
@@ -416,29 +426,13 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           selectedWallet: null,
           publicKey: null,
           balance: 0,
+          fiatValue: 0,
           keypair: null,
           isConnected: false,
           isLoading: false,
         });
         return false;
       }
-
-      // Validate that we have at least one valid wallet
-      console.log(
-        "🔍 Validating wallets:",
-        wallets.map((w) => ({
-          id: w?.id,
-          hasKeypair: !!w?.keypair,
-          hasPublicKey: !!w?.publicKey,
-          keypairPublicKey: w?.keypair?.publicKey?.toString(),
-          storedPublicKey: w?.publicKey,
-          isValid:
-            w &&
-            w.keypair &&
-            w.publicKey &&
-            w.keypair.publicKey.toString() === w.publicKey,
-        }))
-      );
 
       const validWallets = wallets.filter(
         (wallet) =>
@@ -448,41 +442,30 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           wallet.keypair.publicKey.toString() === wallet.publicKey
       );
 
-      console.log("🔍 Valid wallets after filtering:", validWallets.length);
-
       if (validWallets.length === 0) {
-        console.log("🔍 No valid wallets found, showing onboarding");
-        set({
-          wallets: [],
-          selectedWalletId: null,
-          selectedWallet: null,
-          publicKey: null,
-          balance: 0,
-          keypair: null,
-          isConnected: false,
-          isLoading: false,
-        });
         return false;
       }
 
       // Select the first valid wallet by default
       const selectedWalletId = validWallets[0].id;
       const selectedWallet = validWallets[0];
-      console.log(
-        "🔍 Setting connected state - found",
-        validWallets.length,
-        "valid wallets"
-      );
       set({
         wallets: validWallets,
         selectedWalletId,
         selectedWallet,
         publicKey: selectedWallet.publicKey,
         balance: selectedWallet.balance,
+        fiatValue: selectedWallet.balance * get().solPrice,
         keypair: selectedWallet.keypair,
         isConnected: true,
         isLoading: false,
       });
+
+      // Fetch the actual balance from blockchain after setting up the wallet
+      // Use setTimeout to avoid blocking the UI
+      setTimeout(() => {
+        get().updateBalance();
+      }, 100);
 
       return true;
     } catch (error) {
@@ -504,6 +487,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         selectedWallet: null,
         publicKey: null,
         balance: 0,
+        fiatValue: 0,
         keypair: null,
         isConnected: false,
         isLoading: false,
@@ -522,7 +506,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     // Rate limiting: only update balance every 5 seconds
     const now = Date.now();
     if (now - lastBalanceUpdate < 5000) {
-      console.log("Rate limiting: skipping balance update");
       return;
     }
 
@@ -539,9 +522,13 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           : wallet
       );
 
+      // Get current SOL price to calculate USD value
+      const { solPrice } = get();
+
       set({
         wallets: updatedWallets,
         balance: solBalance,
+        fiatValue: solBalance * solPrice,
         lastBalanceUpdate: now,
       });
     } catch (error) {
@@ -607,12 +594,38 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
-  // Debug secure storage
-  debugStorage: async () => {
+  // Update SOL price from API
+  updateSolPrice: async () => {
+    const { isPriceLoading, selectedCurrency } = get();
+
+    // Prevent multiple simultaneous requests
+    if (isPriceLoading) return;
+
+    set({ isPriceLoading: true });
+
     try {
-      await SecureWalletStorage.debugStorage();
+      const price = await priceService.getSolPrice(selectedCurrency);
+      const now = Date.now();
+
+      set({
+        solPrice: price,
+        priceLastUpdated: now,
+        isPriceLoading: false,
+      });
+
+      // Update fiat value when price changes
+      const { balance } = get();
+      set({ fiatValue: balance * price });
     } catch (error) {
-      console.error("Failed to debug storage:", error);
+      console.error("Failed to update SOL price:", error);
+      set({ isPriceLoading: false });
     }
+  },
+
+  // Set selected currency
+  setCurrency: (currency: string) => {
+    set({ selectedCurrency: currency });
+    // Update price with new currency
+    get().updateSolPrice();
   },
 }));
