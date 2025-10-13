@@ -30,10 +30,9 @@ export enum IconName {
 }
 
 export enum Route {
-  ONBOARDING = "/onboarding",
   TABS = "/(tabs)",
-  CREATE_WALLET = "/onboarding/create-wallet",
-  IMPORT_WALLET = "/onboarding/import-wallet",
+  CREATE_WALLET = "/create-wallet",
+  IMPORT_WALLET = "/import-wallet",
 }
 
 export enum ButtonVariant {

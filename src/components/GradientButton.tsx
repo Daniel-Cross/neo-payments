@@ -102,7 +102,7 @@ export const GradientButton = ({
             styles.button,
             styles.outlineButton,
             sizeStyles,
-            { borderColor: theme.colors.ELECTRIC_BLUE },
+            { borderColor: theme.colors.NEON_PINK },
             disabled && styles.disabled,
           ]}
         >
@@ -158,16 +158,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     borderRadius: 8,
-    // Add padding to match border width of outline buttons
-    paddingHorizontal: 2,
-    paddingVertical: 2,
   },
   outlineButton: {
     backgroundColor: "transparent",
     borderWidth: 2,
-    // Remove padding since border takes up the space
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    // Use negative margin to compensate for border width
+    margin: -2,
   },
   // Typography component handles font styling
   disabled: {

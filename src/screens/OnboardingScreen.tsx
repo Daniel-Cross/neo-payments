@@ -9,9 +9,9 @@ import Logo, { LogoSize } from "../components/Logo";
 import {
   GradientType,
   ButtonVariant,
-  Route,
   TypographyVariant,
   TypographyAlign,
+  Route,
 } from "../constants/enums";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";

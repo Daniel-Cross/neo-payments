@@ -378,11 +378,16 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     try {
       // First try to load multiple wallets
       let wallets = await SecureWalletStorage.getWallets();
+      console.log("🔍 Loaded wallets from storage:", wallets?.length || 0);
 
       // If no wallets found, try to migrate from old single wallet format
       if (!wallets || wallets.length === 0) {
+        console.log(
+          "🔍 No wallets found, checking for old single wallet format"
+        );
         const oldKeypair = await SecureWalletStorage.getWallet();
         if (oldKeypair) {
+          console.log("🔍 Found old wallet, migrating to new format");
           // Migrate old single wallet to new multi-wallet format
           const publicKey = oldKeypair.publicKey.toString();
           const migratedWallet: Wallet = {
@@ -399,6 +404,8 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           // Store in new format and clean up old format
           await SecureWalletStorage.storeWallets(wallets);
           await SecureWalletStorage.removeWallet();
+        } else {
+          console.log("🔍 No old wallet found either");
         }
       }
 
@@ -416,16 +423,58 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         return false;
       }
 
-      // Select the first wallet by default
-      const selectedWalletId = wallets[0].id;
-      const selectedWallet = wallets[0];
+      // Validate that we have at least one valid wallet
+      console.log(
+        "🔍 Validating wallets:",
+        wallets.map((w) => ({
+          id: w?.id,
+          hasKeypair: !!w?.keypair,
+          hasPublicKey: !!w?.publicKey,
+          keypairPublicKey: w?.keypair?.publicKey?.toString(),
+          storedPublicKey: w?.publicKey,
+          isValid:
+            w &&
+            w.keypair &&
+            w.publicKey &&
+            w.keypair.publicKey.toString() === w.publicKey,
+        }))
+      );
+
+      const validWallets = wallets.filter(
+        (wallet) =>
+          wallet &&
+          wallet.keypair &&
+          wallet.publicKey &&
+          wallet.keypair.publicKey.toString() === wallet.publicKey
+      );
+
+      console.log("🔍 Valid wallets after filtering:", validWallets.length);
+
+      if (validWallets.length === 0) {
+        console.log("🔍 No valid wallets found, showing onboarding");
+        set({
+          wallets: [],
+          selectedWalletId: null,
+          selectedWallet: null,
+          publicKey: null,
+          balance: 0,
+          keypair: null,
+          isConnected: false,
+          isLoading: false,
+        });
+        return false;
+      }
+
+      // Select the first valid wallet by default
+      const selectedWalletId = validWallets[0].id;
+      const selectedWallet = validWallets[0];
       console.log(
         "🔍 Setting connected state - found",
-        wallets.length,
-        "wallets"
+        validWallets.length,
+        "valid wallets"
       );
       set({
-        wallets,
+        wallets: validWallets,
         selectedWalletId,
         selectedWallet,
         publicKey: selectedWallet.publicKey,

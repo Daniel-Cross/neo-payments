@@ -21,7 +21,7 @@ const SettingsScreen = () => {
         text2:
           "Your wallet has been disconnected and removed from secure storage.",
       });
-      router.replace(Route.ONBOARDING);
+      router.replace(Route.TABS);
     } catch (error) {
       Toast.show({
         type: "error",

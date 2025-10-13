@@ -4,6 +4,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { GradientBackground } from "../components/GradientBackground";
 import { GradientCard } from "../components/GradientCard";
 import { GradientButton } from "../components/GradientButton";
+import Header from "../components/Header";
 import { GradientType, ButtonVariant, Route } from "../constants/enums";
 import { useWalletStore } from "../store/walletStore";
 import { router } from "expo-router";
@@ -82,6 +83,7 @@ const ImportWalletScreen = () => {
       gradient={GradientType.PRIMARY}
       style={styles.container}
     >
+      <Header />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

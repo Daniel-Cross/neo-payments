@@ -20,7 +20,7 @@ export default function RootLayout() {
 }
 
 function AppNavigator() {
-  const { isConnected, loadWallets } = useWalletStore();
+  const { loadWallets } = useWalletStore();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,7 +42,7 @@ function AppNavigator() {
     };
 
     initializeApp();
-  }, []); // Remove loadWallets from dependencies to prevent multiple calls
+  }, []);
 
   // Show loading screen while fonts or wallet are loading
   if (!fontsLoaded || isLoading) {
@@ -60,27 +60,17 @@ function AppNavigator() {
     );
   }
 
-  // Default to onboarding screen - only show home if wallet is connected
-  if (isConnected) {
-    return (
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    );
-  }
-
-  // Show onboarding by default (when not connected)
+  // Always show tabs - HomeScreen will show onboarding content when no wallet connected
   return (
     <Stack
       screenOptions={{
         headerShown: false,
       }}
     >
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
+      <Stack.Screen name="create-wallet" />
+      <Stack.Screen name="import-wallet" />
     </Stack>
   );
 }

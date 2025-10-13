@@ -1,13 +1,23 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { GradientBackground } from "../components/GradientBackground";
 import { GradientCard } from "../components/GradientCard";
 import { GradientButton } from "../components/GradientButton";
-import { GradientType, ButtonVariant, Route } from "../constants/enums";
+import Header from "../components/Header";
+import { Typography } from "../components/Typography";
+import {
+  GradientType,
+  ButtonVariant,
+  Route,
+  TypographyVariant,
+  TypographyAlign,
+} from "../constants/enums";
 import { useWalletStore } from "../store/walletStore";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { EDGE_MARGIN } from "../constants/styles";
 
 const CreateWalletScreen = () => {
   const { theme } = useTheme();
@@ -44,73 +54,104 @@ const CreateWalletScreen = () => {
     }
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
   return (
     <GradientBackground
       gradient={GradientType.PRIMARY}
       style={styles.container}
     >
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
-            Create New Wallet
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.text.LIGHT_GREY }]}>
-            Generate a new Solana wallet with a secure private key
-          </Text>
-        </View>
-
-        <GradientCard style={styles.infoCard}>
-          <Text style={[styles.infoTitle, { color: theme.text.SOFT_WHITE }]}>
-            🔐 Security Information
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • Your private key will be encrypted and stored securely on your
-            device
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • You can export your private key anytime from settings
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • Never share your private key with anyone
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • Make sure to backup your wallet before using it
-          </Text>
-        </GradientCard>
-
-        <GradientCard style={styles.warningCard}>
-          <Text
-            style={[styles.warningTitle, { color: theme.text.WARNING_ORANGE }]}
+      <Header />
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Typography
+            variant={TypographyVariant.HEADLINE_SMALL}
+            color={theme.text.SOFT_WHITE}
+            style={styles.title}
           >
-            ⚠️ Important
-          </Text>
-          <Text style={[styles.warningText, { color: theme.text.LIGHT_GREY }]}>
-            This will create a new wallet. If you already have a wallet, use
-            "Import Existing Wallet" instead.
-          </Text>
-        </GradientCard>
+            Create New Wallet
+          </Typography>
+          <View style={styles.content}>
+            <View style={styles.subtitleContainer}>
+              <Typography
+                variant={TypographyVariant.BODY_LARGE}
+                color={theme.text.LIGHT_GREY}
+                textAlign={TypographyAlign.CENTER}
+              >
+                Generate a new Solana wallet
+              </Typography>
+            </View>
 
-        <View style={styles.buttonContainer}>
-          <GradientButton
-            title={isCreating ? "Creating Wallet..." : "Create Wallet"}
-            onPress={handleCreateWallet}
-            variant={ButtonVariant.PRIMARY}
-            disabled={isCreating}
-            loading={isCreating}
-            style={styles.createButton}
-          />
-          <GradientButton
-            title="Go Back"
-            onPress={handleGoBack}
-            variant={ButtonVariant.SECONDARY}
-            style={styles.backButton}
-          />
-        </View>
-      </View>
+            <GradientCard style={styles.infoCard}>
+              <Typography
+                variant={TypographyVariant.HEADLINE_SMALL}
+                color={theme.text.SOFT_WHITE}
+                style={styles.infoTitle}
+              >
+                🔐 Security Information
+              </Typography>
+              <Typography
+                variant={TypographyVariant.BODY_MEDIUM}
+                color={theme.text.LIGHT_GREY}
+                style={styles.infoText}
+              >
+                • Your private key will be encrypted and stored securely on your
+                device
+              </Typography>
+              <Typography
+                variant={TypographyVariant.BODY_MEDIUM}
+                color={theme.text.LIGHT_GREY}
+                style={styles.infoText}
+              >
+                • You can export your private key anytime from settings
+              </Typography>
+              <Typography
+                variant={TypographyVariant.BODY_MEDIUM}
+                color={theme.text.LIGHT_GREY}
+                style={styles.infoText}
+              >
+                • Never share your private key with anyone
+              </Typography>
+              <Typography
+                variant={TypographyVariant.BODY_MEDIUM}
+                color={theme.text.LIGHT_GREY}
+                style={styles.infoText}
+              >
+                • Make sure to backup your wallet before using it
+              </Typography>
+            </GradientCard>
+
+            <GradientCard style={styles.warningCard}>
+              <Typography
+                variant={TypographyVariant.HEADLINE_SMALL}
+                color={theme.text.WARNING_ORANGE}
+                style={styles.warningTitle}
+              >
+                ⚠️ Important
+              </Typography>
+              <Typography
+                variant={TypographyVariant.BODY_MEDIUM}
+                color={theme.text.LIGHT_GREY}
+              >
+                This will create a new wallet. If you already have a wallet, use
+                "Import Existing Wallet" instead.
+              </Typography>
+            </GradientCard>
+
+            <View style={styles.buttonContainer}>
+              <GradientButton
+                title={isCreating ? "Creating Wallet..." : "Create Wallet"}
+                onPress={handleCreateWallet}
+                variant={ButtonVariant.PRIMARY}
+                disabled={isCreating}
+                loading={isCreating}
+                style={styles.createButton}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </GradientBackground>
   );
 };
@@ -118,15 +159,10 @@ const CreateWalletScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingHorizontal: EDGE_MARGIN,
   },
   content: {
     flex: 1,
-    padding: 20,
-    paddingTop: 60,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 30,
   },
   title: {
     fontSize: 28,
@@ -134,35 +170,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 12,
   },
-  subtitle: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 22,
+  subtitleContainer: {
+    alignItems: "center",
+    marginBottom: 30,
   },
   infoCard: {
-    marginBottom: 20,
+    marginBottom: EDGE_MARGIN,
   },
   infoTitle: {
-    fontSize: 18,
-    fontWeight: "600",
     marginBottom: 12,
+    // Typography component handles font styling
   },
   infoText: {
-    fontSize: 14,
-    lineHeight: 20,
     marginBottom: 8,
+    // Typography component handles font styling
   },
   warningCard: {
     marginBottom: 30,
   },
   warningTitle: {
-    fontSize: 18,
-    fontWeight: "600",
     marginBottom: 8,
-  },
-  warningText: {
-    fontSize: 14,
-    lineHeight: 20,
+    // Typography component handles font styling
   },
   buttonContainer: {
     flex: 1,
@@ -170,9 +198,6 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginBottom: 16,
-  },
-  backButton: {
-    marginBottom: 20,
   },
 });
 
