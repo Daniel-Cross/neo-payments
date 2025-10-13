@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { Typography } from "../components/Typography";
 import { TypographyVariant } from "../constants/enums";
+import { TOAST } from "../constants/colours";
 
 export enum ToastType {
   SUCCESS = "success",
@@ -98,7 +99,7 @@ const showToast = ({
     visibilityTime,
     autoHide: visibilityTime !== ToastDuration.Indefinite,
     props,
-    topOffset: 60,
+    topOffset: 70,
     onShow: () => {
       switch (type) {
         case ToastType.SUCCESS:
@@ -144,22 +145,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: "row",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   toastSuccess: {
-    backgroundColor: "#00FF00",
+    backgroundColor: TOAST.SUCCESS,
   },
   toastError: {
-    backgroundColor: "#FF4444",
+    backgroundColor: TOAST.ERROR,
   },
   toastWarning: {
-    backgroundColor: "#FF8800",
+    backgroundColor: TOAST.WARNING,
   },
   toastInfo: {
-    backgroundColor: "#0066FF",
+    backgroundColor: TOAST.INFO,
   },
 });

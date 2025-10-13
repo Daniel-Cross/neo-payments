@@ -1,18 +1,18 @@
 // Primary brand colors
 export const COLORS = {
-  PRIMARY_GREEN: "#00FF00",
+  PRIMARY_GREEN: "#2DA82D",
   PRIMARY_GREEN_DARK: "#00CC00",
   PRIMARY_GREEN_LIGHT: "#33FF33",
   ACCENT_BLUE: "#0066FF",
   ACCENT_PURPLE: "#6600FF",
 };
 
-// Background colors
+// Background colors - Navy-based dark mode
 export const BACKGROUND = {
-  NAVY: "#0A0F1E", // Top of gradient
-  SOFT_BLACK: "#1A1A1A", // Bottom of gradient
-  DARK_GREY: "#2A2A2A",
-  CARD_DARK: "#1E1E1E",
+  NAVY: "#0A0F1E", // Main app background (solid navy)
+  NAVY_LIGHT: "#1A2332", // Lighter navy for cards
+  NAVY_LIGHTER: "#2A3441", // Even lighter navy for buttons and interactive elements
+  NAVY_ACCENT: "#3A4451", // Accent navy for hover states
   OVERLAY: "rgba(0, 0, 0, 0.5)",
 };
 
@@ -35,15 +35,23 @@ export const STATUS = {
   INFO: "#0066FF",
 };
 
-// Gradient definitions
+// Toast colors
+export const TOAST = {
+  SUCCESS: COLORS.PRIMARY_GREEN,
+  ERROR: "#FF4444",
+  WARNING: "#FF8800",
+  INFO: COLORS.ACCENT_BLUE,
+};
+
+// Gradient definitions - Navy-based gradients
 export const GRADIENTS = {
   PRIMARY: {
-    colors: [BACKGROUND.NAVY, BACKGROUND.SOFT_BLACK],
+    colors: [BACKGROUND.NAVY, BACKGROUND.NAVY], // Solid navy background
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
   CARD: {
-    colors: [BACKGROUND.CARD_DARK, BACKGROUND.DARK_GREY],
+    colors: [BACKGROUND.NAVY_LIGHT, BACKGROUND.NAVY_LIGHT], // Solid lighter navy for cards
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
@@ -53,7 +61,12 @@ export const GRADIENTS = {
     end: { x: 0, y: 1 },
   },
   BUTTON_SECONDARY: {
-    colors: ["rgba(255, 255, 255, 0.1)", "rgba(255, 255, 255, 0.05)"],
+    colors: [BACKGROUND.NAVY_LIGHTER, BACKGROUND.NAVY_LIGHTER], // Solid lighter navy for secondary buttons
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: 1 },
+  },
+  BUTTON_NAVY: {
+    colors: [BACKGROUND.NAVY_LIGHTER, BACKGROUND.NAVY_ACCENT], // Subtle navy gradient for navy buttons
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },

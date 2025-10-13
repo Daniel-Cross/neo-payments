@@ -41,6 +41,8 @@ export const GradientButton = ({
         return theme.gradients.BUTTON_SECONDARY;
       case ButtonVariant.ACCENT:
         return theme.gradients.ACCENT;
+      case ButtonVariant.NAVY:
+        return theme.gradients.BUTTON_NAVY;
       default:
         return theme.gradients.BUTTON_PRIMARY;
     }
@@ -76,6 +78,8 @@ export const GradientButton = ({
       case ButtonVariant.SECONDARY:
         return theme.text.SOFT_WHITE;
       case ButtonVariant.ACCENT:
+        return theme.text.SOFT_WHITE;
+      case ButtonVariant.NAVY:
         return theme.text.SOFT_WHITE;
       default:
         return "#000";

@@ -46,6 +46,15 @@ export default {
         projectId: "2ed7c203-a8af-4b0d-966d-7b36de74068f",
       },
     },
-    plugins: ["expo-build-properties", "expo-router"],
+    plugins: [
+      "expo-build-properties",
+      [
+        "expo-router",
+        {
+          root: "./app",
+        },
+      ],
+    ],
+    scheme: "blink",
   },
 };

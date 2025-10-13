@@ -11,10 +11,36 @@ export enum GradientType {
   ACCENT = "accent",
 }
 
+export enum TabName {
+  HOME = "home",
+  REQUESTS = "requests",
+  HISTORY = "history",
+  SETTINGS = "settings",
+}
+
+export enum IconName {
+  LIGHTNING_BOLT = "lightning-bolt",
+  LIGHTNING_BOLT_OUTLINE = "lightning-bolt-outline",
+  ACCOUNT_ARROW_UP = "account-arrow-up",
+  ACCOUNT_ARROW_UP_OUTLINE = "account-arrow-up-outline",
+  CLOCK = "clock",
+  CLOCK_OUTLINE = "clock-outline",
+  COG = "cog",
+  COG_OUTLINE = "cog-outline",
+}
+
+export enum Route {
+  ONBOARDING = "/onboarding",
+  TABS = "/(tabs)",
+  CREATE_WALLET = "/onboarding/create-wallet",
+  IMPORT_WALLET = "/onboarding/import-wallet",
+}
+
 export enum ButtonVariant {
   PRIMARY = "primary",
   SECONDARY = "secondary",
   ACCENT = "accent",
+  NAVY = "navy",
 }
 
 export enum ButtonSize {
@@ -54,7 +80,10 @@ export enum TransactionStatus {
 export enum StorageKey {
   WALLET_PRIVATE_KEY = "blink_wallet_private_key",
   WALLET_PUBLIC_KEY = "blink_wallet_public_key",
+  WALLETS_DATA = "blink_wallets_data",
   TEST_KEY = "blink_test_key",
+  TEST_AUTH_KEY = "blink_test_auth_key",
+  DEBUG_TEST_KEY = "blink_debug_test_key",
 }
 
 export enum SecureStorageService {

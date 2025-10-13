@@ -1,10 +1,6 @@
 import { create } from "zustand";
-import {
-  Keypair,
-  Connection,
-  PublicKey,
-  LAMPORTS_PER_SOL,
-} from "@solana/web3.js";
+import { Keypair, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import bs58 from "bs58";
 import * as bip39 from "bip39";
 import { SecureWalletStorage } from "../utils/secureStorage";
 import { SolanaNetwork, ConnectionCommitment } from "../constants/enums";
@@ -15,18 +11,40 @@ const connection = new Connection(
   ConnectionCommitment.CONFIRMED
 );
 
+export interface Wallet {
+  id: string;
+  name: string;
+  publicKey: string;
+  keypair: Keypair;
+  balance: number;
+  createdAt: Date;
+}
+
 export interface WalletState {
   // Wallet data
-  keypair: Keypair | null;
-  publicKey: string | null;
-  balance: number;
+  wallets: Wallet[];
+  selectedWalletId: string | null;
   isConnected: boolean;
   isLoading: boolean;
+  lastBalanceUpdate: number;
+
+  // Computed properties
+  selectedWallet: Wallet | null;
+  publicKey: string | null;
+  balance: number;
+  keypair: Keypair | null;
 
   // Actions
-  createNewWallet: () => Promise<boolean>;
-  importWallet: (privateKey: string) => Promise<boolean>;
-  loadWallet: () => Promise<boolean>;
+  createNewWallet: (name?: string) => Promise<boolean>;
+  importWallet: (privateKey: string, name?: string) => Promise<boolean>;
+  importWalletFromSeedPhrase: (
+    seedPhrase: string,
+    name?: string
+  ) => Promise<boolean>;
+  selectWallet: (walletId: string) => void;
+  renameWallet: (walletId: string, newName: string) => Promise<boolean>;
+  deleteWallet: (walletId: string) => Promise<boolean>;
+  loadWallets: () => Promise<boolean>;
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
   exportPrivateKey: () => Promise<string | null>;
@@ -36,20 +54,46 @@ export interface WalletState {
   debugStorage: () => Promise<void>;
 }
 
+// Helper function to generate wallet name
+const generateWalletName = (
+  wallets: Wallet[],
+  type: "created" | "imported" = "created"
+): string => {
+  const prefix = type === "created" ? "Wallet" : "Imported Wallet";
+  const existingNames = wallets.map((w) => w.name);
+  let counter = 1;
+  let name = `${prefix} ${counter}`;
+
+  while (existingNames.includes(name)) {
+    counter++;
+    name = `${prefix} ${counter}`;
+  }
+
+  return name;
+};
+
 export const useWalletStore = create<WalletState>()((set, get) => ({
   // Initial state
-  keypair: null,
-  publicKey: null,
-  balance: 0,
+  wallets: [],
+  selectedWalletId: null,
   isConnected: false,
   isLoading: false,
+  lastBalanceUpdate: 0,
+
+  // Computed properties
+  selectedWallet: null as Wallet | null,
+  publicKey: null as string | null,
+  balance: 0,
+  keypair: null as Keypair | null,
 
   // Create a new wallet
-  createNewWallet: async () => {
+  createNewWallet: async (name?: string) => {
     set({ isLoading: true });
     try {
+      const { wallets } = get();
       const keypair = Keypair.generate();
       const publicKey = keypair.publicKey.toString();
+      const walletName = name || generateWalletName(wallets, "created");
 
       // Verify the keypair is valid
       const testKeypair = Keypair.fromSecretKey(keypair.secretKey);
@@ -58,17 +102,32 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         throw new Error("Generated keypair validation failed");
       }
 
-      // Store wallet securely
-      const stored = await SecureWalletStorage.storeWallet(keypair);
+      const newWallet: Wallet = {
+        id: `wallet_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 11)}`,
+        name: walletName,
+        publicKey,
+        keypair,
+        balance: 0,
+        createdAt: new Date(),
+      };
+
+      // Store all wallets securely
+      const updatedWallets = [...wallets, newWallet];
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
       if (!stored) {
         throw new Error("Failed to store wallet securely");
       }
 
       set({
-        keypair,
-        publicKey,
+        wallets: updatedWallets,
+        selectedWalletId: newWallet.id,
+        selectedWallet: newWallet,
+        publicKey: newWallet.publicKey,
+        balance: newWallet.balance,
+        keypair: newWallet.keypair,
         isConnected: true,
-        balance: 0,
         isLoading: false,
       });
 
@@ -81,31 +140,97 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   },
 
   // Import wallet from private key
-  importWallet: async (privateKey: string) => {
+  importWallet: async (privateKey: string, name?: string) => {
     set({ isLoading: true });
     try {
-      // Remove '0x' prefix if present
-      const cleanPrivateKey = privateKey.replace("0x", "");
+      const { wallets } = get();
 
-      // Convert hex string to Uint8Array
-      const privateKeyBytes = new Uint8Array(
-        cleanPrivateKey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-      );
+      // Clean the input
+      const cleanPrivateKey = privateKey.trim();
+
+      // Validate private key format
+      if (!cleanPrivateKey || cleanPrivateKey.length === 0) {
+        throw new Error("Private key cannot be empty");
+      }
+
+      let privateKeyBytes: Uint8Array;
+
+      try {
+        // Try base58 first (Phantom format)
+        privateKeyBytes = bs58.decode(cleanPrivateKey);
+      } catch (base58Error) {
+        try {
+          // Try hex format (remove '0x' prefix if present)
+          const hexKey = cleanPrivateKey.replace("0x", "");
+
+          // Check if it's a valid hex string
+          if (!/^[0-9a-fA-F]+$/.test(hexKey)) {
+            throw new Error(
+              "Private key must be in base58 or hexadecimal format"
+            );
+          }
+
+          // Check if it's the correct length (64 bytes = 128 hex characters)
+          if (hexKey.length !== 128) {
+            throw new Error(
+              `Hex private key must be 64 bytes (128 hex characters). Got ${hexKey.length} characters`
+            );
+          }
+
+          // Convert hex string to Uint8Array
+          privateKeyBytes = new Uint8Array(
+            hexKey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+          );
+        } catch (hexError) {
+          throw new Error(
+            "Private key must be in base58 (Phantom) or hexadecimal format"
+          );
+        }
+      }
+
+      // Validate the byte array length
+      if (privateKeyBytes.length !== 64) {
+        throw new Error(
+          `Invalid private key length: expected 64 bytes, got ${privateKeyBytes.length}`
+        );
+      }
 
       const keypair = Keypair.fromSecretKey(privateKeyBytes);
       const publicKey = keypair.publicKey.toString();
+      const walletName = name || generateWalletName(wallets, "imported");
 
-      // Store wallet securely
-      const stored = await SecureWalletStorage.storeWallet(keypair);
+      // Check if wallet already exists
+      const existingWallet = wallets.find((w) => w.publicKey === publicKey);
+      if (existingWallet) {
+        throw new Error("Wallet with this public key already exists");
+      }
+
+      const newWallet: Wallet = {
+        id: `wallet_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 11)}`,
+        name: walletName,
+        publicKey,
+        keypair,
+        balance: 0,
+        createdAt: new Date(),
+      };
+
+      // Store all wallets securely
+      const updatedWallets = [...wallets, newWallet];
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
       if (!stored) {
         throw new Error("Failed to store wallet securely");
       }
 
       set({
-        keypair,
-        publicKey,
+        wallets: updatedWallets,
+        selectedWalletId: newWallet.id,
+        selectedWallet: newWallet,
+        publicKey: newWallet.publicKey,
+        balance: newWallet.balance,
+        keypair: newWallet.keypair,
         isConnected: true,
-        balance: 0,
         isLoading: false,
       });
 
@@ -117,42 +242,223 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
-  // Load wallet from secure storage
-  loadWallet: async () => {
+  // Import wallet from seed phrase (mnemonic)
+  importWalletFromSeedPhrase: async (seedPhrase: string, name?: string) => {
     set({ isLoading: true });
     try {
-      const keypair = await SecureWalletStorage.getWallet();
-      if (!keypair) {
-        set({ isLoading: false });
-        return false;
+      const { wallets } = get();
+
+      // Clean and validate seed phrase
+      const cleanSeedPhrase = seedPhrase.trim().toLowerCase();
+      if (!bip39.validateMnemonic(cleanSeedPhrase)) {
+        throw new Error("Invalid seed phrase");
       }
 
+      // Generate seed from mnemonic
+      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
+
+      // For Solana, we need to use the first 32 bytes of the seed
+      // and create a keypair from it
+      const seedBytes = seed.slice(0, 32);
+      const keypair = Keypair.fromSeed(seedBytes);
       const publicKey = keypair.publicKey.toString();
+      const walletName = name || generateWalletName(wallets, "imported");
+
+      // Check if wallet already exists
+      const existingWallet = wallets.find((w) => w.publicKey === publicKey);
+      if (existingWallet) {
+        throw new Error("Wallet with this public key already exists");
+      }
+
+      const newWallet: Wallet = {
+        id: `wallet_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 11)}`,
+        name: walletName,
+        publicKey,
+        keypair,
+        balance: 0,
+        createdAt: new Date(),
+      };
+
+      // Store all wallets securely
+      const updatedWallets = [...wallets, newWallet];
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
+      if (!stored) {
+        throw new Error("Failed to store wallet securely");
+      }
 
       set({
-        keypair,
-        publicKey,
+        wallets: updatedWallets,
+        selectedWalletId: newWallet.id,
+        selectedWallet: newWallet,
+        publicKey: newWallet.publicKey,
+        balance: newWallet.balance,
+        keypair: newWallet.keypair,
         isConnected: true,
         isLoading: false,
       });
 
       return true;
     } catch (error) {
-      console.error("Failed to load wallet:", error);
+      console.error("Failed to import wallet from seed phrase:", error);
       set({ isLoading: false });
       return false;
     }
   },
 
-  // Disconnect wallet
+  // Select a wallet
+  selectWallet: (walletId: string) => {
+    const { wallets } = get();
+    const wallet = wallets.find((w) => w.id === walletId);
+    if (wallet) {
+      set({
+        selectedWalletId: walletId,
+        selectedWallet: wallet,
+        publicKey: wallet.publicKey,
+        balance: wallet.balance,
+        keypair: wallet.keypair,
+        isConnected: true,
+      });
+    }
+  },
+
+  // Rename a wallet
+  renameWallet: async (walletId: string, newName: string) => {
+    try {
+      const { wallets } = get();
+      const updatedWallets = wallets.map((wallet) =>
+        wallet.id === walletId ? { ...wallet, name: newName } : wallet
+      );
+
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
+      if (stored) {
+        set({ wallets: updatedWallets });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to rename wallet:", error);
+      return false;
+    }
+  },
+
+  // Delete a wallet
+  deleteWallet: async (walletId: string) => {
+    try {
+      const { wallets, selectedWalletId } = get();
+      const updatedWallets = wallets.filter((wallet) => wallet.id !== walletId);
+
+      // If we're deleting the selected wallet, select another one or disconnect
+      let newSelectedWalletId = selectedWalletId;
+      if (selectedWalletId === walletId) {
+        newSelectedWalletId =
+          updatedWallets.length > 0 ? updatedWallets[0].id : null;
+      }
+
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
+      if (stored) {
+        set({
+          wallets: updatedWallets,
+          selectedWalletId: newSelectedWalletId,
+          isConnected: newSelectedWalletId !== null,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to delete wallet:", error);
+      return false;
+    }
+  },
+
+  // Load wallets from secure storage
+  loadWallets: async () => {
+    set({ isLoading: true });
+    try {
+      // First try to load multiple wallets
+      let wallets = await SecureWalletStorage.getWallets();
+
+      // If no wallets found, try to migrate from old single wallet format
+      if (!wallets || wallets.length === 0) {
+        const oldKeypair = await SecureWalletStorage.getWallet();
+        if (oldKeypair) {
+          // Migrate old single wallet to new multi-wallet format
+          const publicKey = oldKeypair.publicKey.toString();
+          const migratedWallet: Wallet = {
+            id: `wallet_${Date.now()}_migrated`,
+            name: "My Wallet",
+            publicKey,
+            keypair: oldKeypair,
+            balance: 0,
+            createdAt: new Date(),
+          };
+
+          wallets = [migratedWallet];
+
+          // Store in new format and clean up old format
+          await SecureWalletStorage.storeWallets(wallets);
+          await SecureWalletStorage.removeWallet();
+        }
+      }
+
+      if (!wallets || wallets.length === 0) {
+        set({
+          wallets: [],
+          selectedWalletId: null,
+          isConnected: false,
+          isLoading: false,
+        });
+        return false;
+      }
+
+      // Select the first wallet by default
+      const selectedWalletId = wallets[0].id;
+      console.log(
+        "loadWallets setting selectedWalletId:",
+        selectedWalletId,
+        "from wallet:",
+        wallets[0].name
+      );
+
+      const selectedWallet = wallets[0];
+      console.log("About to set state with:", {
+        wallets: wallets.length,
+        selectedWalletId,
+        isConnected: true,
+      });
+      set({
+        wallets,
+        selectedWalletId,
+        selectedWallet,
+        publicKey: selectedWallet.publicKey,
+        balance: selectedWallet.balance,
+        keypair: selectedWallet.keypair,
+        isConnected: true,
+        isLoading: false,
+      });
+      console.log("State set complete");
+
+      return true;
+    } catch (error) {
+      console.error("Failed to load wallets:", error);
+      set({ isLoading: false });
+      return false;
+    }
+  },
+
+  // Disconnect wallet (clear all wallets)
   disconnectWallet: async () => {
     set({ isLoading: true });
     try {
-      await SecureWalletStorage.removeWallet();
+      await SecureWalletStorage.removeWallets();
       set({
-        keypair: null,
+        wallets: [],
+        selectedWalletId: null,
+        selectedWallet: null,
         publicKey: null,
         balance: 0,
+        keypair: null,
         isConnected: false,
         isLoading: false,
       });
@@ -164,23 +470,51 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
   // Update balance from blockchain
   updateBalance: async () => {
-    const { keypair } = get();
-    if (!keypair) return;
+    const { selectedWallet, wallets, lastBalanceUpdate } = get();
+    if (!selectedWallet) return;
+
+    // Rate limiting: only update balance every 5 seconds
+    const now = Date.now();
+    if (now - lastBalanceUpdate < 5000) {
+      console.log("Rate limiting: skipping balance update");
+      return;
+    }
 
     try {
-      const balance = await connection.getBalance(keypair.publicKey);
+      const balance = await connection.getBalance(
+        selectedWallet.keypair.publicKey
+      );
       const solBalance = balance / LAMPORTS_PER_SOL;
 
-      set({ balance: solBalance });
+      // Update the balance for the selected wallet
+      const updatedWallets = wallets.map((wallet) =>
+        wallet.id === selectedWallet.id
+          ? { ...wallet, balance: solBalance }
+          : wallet
+      );
+
+      set({
+        wallets: updatedWallets,
+        balance: solBalance,
+        lastBalanceUpdate: now,
+      });
     } catch (error) {
       console.error("Failed to fetch balance:", error);
+      // Don't throw the error, just log it to avoid breaking the app
     }
   },
 
   // Export private key (for backup purposes)
   exportPrivateKey: async () => {
     try {
-      return await SecureWalletStorage.exportPrivateKey();
+      const { selectedWallet } = get();
+      if (!selectedWallet) return null;
+
+      // Convert keypair to hex string
+      const privateKeyHex = Buffer.from(
+        selectedWallet.keypair.secretKey
+      ).toString("hex");
+      return privateKeyHex;
     } catch (error) {
       console.error("Failed to export private key:", error);
       return null;
@@ -190,20 +524,12 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   // Export seed phrase (for backup purposes)
   exportSeedPhrase: async () => {
     try {
-      // Get the private key from secure storage
-      const privateKeyHex = await SecureWalletStorage.exportPrivateKey();
-      if (!privateKeyHex) {
-        return null;
-      }
-
-      // Convert hex string back to Uint8Array
-      const privateKeyBytes = new Uint8Array(
-        privateKeyHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-      );
+      const { selectedWallet } = get();
+      if (!selectedWallet) return null;
 
       // Generate mnemonic from the private key
       // Note: This creates a mnemonic that can regenerate the same private key
-      const seed = Buffer.from(privateKeyBytes.slice(0, 32)); // Use first 32 bytes for seed
+      const seed = Buffer.from(selectedWallet.keypair.secretKey.slice(0, 32)); // Use first 32 bytes for seed
       const mnemonic = bip39.entropyToMnemonic(seed.toString("hex"));
 
       return mnemonic;

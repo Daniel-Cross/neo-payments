@@ -5,6 +5,7 @@ import {
   SecureStorageService,
   AuthPrompt,
 } from "../constants/enums";
+import { Wallet } from "../store/walletStore";
 
 export class SecureWalletStorage {
   /**
@@ -166,7 +167,7 @@ export class SecureWalletStorage {
    */
   static async testWithAuth(): Promise<boolean> {
     try {
-      const testKey = "test_auth_key";
+      const testKey = StorageKey.TEST_AUTH_KEY;
       const testValue = "test_auth_value";
 
       await SecureStore.setItemAsync(testKey, testValue, {
@@ -196,7 +197,7 @@ export class SecureWalletStorage {
   static async debugStorage(): Promise<void> {
     try {
       // Test basic storage/retrieval with keychain service
-      const testKey = "debug_test_key";
+      const testKey = StorageKey.DEBUG_TEST_KEY;
       const testValue = "debug_test_value";
 
       try {
@@ -246,6 +247,102 @@ export class SecureWalletStorage {
       }
     } catch (error) {
       console.error("Debug storage failed:", error);
+    }
+  }
+
+  /**
+   * Store multiple wallets securely
+   */
+  static async storeWallets(wallets: Wallet[]): Promise<boolean> {
+    try {
+      // Convert wallets to a serializable format
+      const walletsData = wallets.map((wallet) => ({
+        id: wallet.id,
+        name: wallet.name,
+        publicKey: wallet.publicKey,
+        balance: wallet.balance,
+        createdAt: wallet.createdAt.toISOString(),
+        // Store private key separately for security
+        privateKeyHex: Array.from(wallet.keypair.secretKey)
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join(""),
+      }));
+
+      await SecureStore.setItemAsync(
+        StorageKey.WALLETS_DATA,
+        JSON.stringify(walletsData),
+        {
+          requireAuthentication: true,
+          authenticationPrompt: AuthPrompt.ACCESS_WALLET,
+          keychainService: SecureStorageService.BLINK_WALLET,
+        }
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Failed to store wallets securely:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Retrieve all wallets from secure storage
+   */
+  static async getWallets(): Promise<Wallet[]> {
+    try {
+      const walletsDataString = await SecureStore.getItemAsync(
+        StorageKey.WALLETS_DATA,
+        {
+          requireAuthentication: true,
+          authenticationPrompt: AuthPrompt.ACCESS_WALLET,
+          keychainService: SecureStorageService.BLINK_WALLET,
+        }
+      );
+
+      if (!walletsDataString) {
+        return [];
+      }
+
+      const walletsData = JSON.parse(walletsDataString);
+
+      // Convert back to Wallet objects with Keypair
+      const wallets: Wallet[] = walletsData.map((data: any) => {
+        const privateKeyBytes = new Uint8Array(
+          data.privateKeyHex
+            .match(/.{1,2}/g)!
+            .map((byte: string) => parseInt(byte, 16))
+        );
+        const keypair = Keypair.fromSecretKey(privateKeyBytes);
+
+        return {
+          id: data.id,
+          name: data.name,
+          publicKey: data.publicKey,
+          keypair,
+          balance: data.balance,
+          createdAt: new Date(data.createdAt),
+        };
+      });
+
+      return wallets;
+    } catch (error) {
+      console.error("Failed to retrieve wallets from secure storage:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Remove all wallets from secure storage
+   */
+  static async removeWallets(): Promise<boolean> {
+    try {
+      await SecureStore.deleteItemAsync(StorageKey.WALLETS_DATA, {
+        keychainService: SecureStorageService.BLINK_WALLET,
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to remove wallets from secure storage:", error);
+      return false;
     }
   }
 }

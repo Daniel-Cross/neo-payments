@@ -50,14 +50,13 @@ export default function WalletScreen() {
     isLoading,
     createNewWallet,
     importWallet,
-    loadWallet,
+    loadWallets,
     disconnectWallet,
     updateBalance,
     exportPrivateKey,
     exportSeedPhrase,
     checkSecureStorage,
     testSecureStorage,
-    debugStorage,
   } = useWalletStore();
 
   const [privateKeyInput, setPrivateKeyInput] = useState("");
@@ -71,12 +70,12 @@ export default function WalletScreen() {
       setSecureStorageAvailable(isAvailable);
 
       if (isAvailable) {
-        await loadWallet();
+        await loadWallets();
       }
     };
 
     initializeWallet();
-  }, [checkSecureStorage, loadWallet]);
+  }, [checkSecureStorage, loadWallets]);
 
   // Update balance when wallet is connected
   useEffect(() => {
@@ -253,20 +252,6 @@ export default function WalletScreen() {
           disabled={!secureStorageAvailable}
           style={!secureStorageAvailable ? styles.disabledButton : undefined}
         />
-
-        <GradientButton
-          title="Test Secure Storage"
-          onPress={handleTestSecureStorage}
-          variant={ButtonVariant.ACCENT}
-          size={ButtonSize.MEDIUM}
-        />
-
-        <GradientButton
-          title="Debug Storage"
-          onPress={debugStorage}
-          variant={ButtonVariant.ACCENT}
-          size={ButtonSize.MEDIUM}
-        />
       </View>
 
       {showImportForm && (
@@ -278,7 +263,7 @@ export default function WalletScreen() {
             style={[
               styles.privateKeyInput,
               {
-                backgroundColor: theme.background.DARK_GREY,
+                backgroundColor: theme.background.NAVY_LIGHT,
                 borderColor: "rgba(255, 255, 255, 0.2)",
                 color: theme.text.SOFT_WHITE,
               },
