@@ -1,14 +1,21 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, TextInput, ScrollView } from "react-native";
+import { View, StyleSheet, TextInput, ScrollView } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { GradientBackground } from "../components/GradientBackground";
 import { GradientCard } from "../components/GradientCard";
 import { GradientButton } from "../components/GradientButton";
+import { Typography } from "../components/Typography";
 import Header from "../components/Header";
-import { GradientType, ButtonVariant, Route } from "../constants/enums";
+import {
+  GradientType,
+  ButtonVariant,
+  Route,
+  TypographyVariant,
+} from "../constants/enums";
 import { useWalletStore } from "../store/walletStore";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
+import { BASE_MARGIN, EDGE_MARGIN } from "../constants/styles";
 
 const ImportWalletScreen = () => {
   const { theme } = useTheme();
@@ -89,19 +96,31 @@ const ImportWalletScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
+          <Typography
+            variant={TypographyVariant.TITLE_LARGE}
+            color={theme.text.SOFT_WHITE}
+            style={styles.title}
+          >
             Import Existing Wallet
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.text.LIGHT_GREY }]}>
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_MEDIUM}
+            color={theme.text.LIGHT_GREY}
+            style={styles.subtitle}
+          >
             Enter your private key or seed phrase to import your existing Solana
             wallet
-          </Text>
+          </Typography>
         </View>
 
         <GradientCard style={styles.inputCard}>
-          <Text style={[styles.inputLabel, { color: theme.text.SOFT_WHITE }]}>
+          <Typography
+            variant={TypographyVariant.BODY_LARGE}
+            color={theme.text.SOFT_WHITE}
+            style={styles.inputLabel}
+          >
             Private Key or Seed Phrase
-          </Text>
+          </Typography>
           <TextInput
             style={[
               styles.textInput,
@@ -123,43 +142,6 @@ const ImportWalletScreen = () => {
             secureTextEntry={false}
           />
         </GradientCard>
-
-        <GradientCard style={styles.infoCard}>
-          <Text style={[styles.infoTitle, { color: theme.text.SOFT_WHITE }]}>
-            📋 How to find your credentials:
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • From Phantom: Settings → Show Secret Recovery Phrase
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • From Solflare: Settings → Export Private Key or Seed Phrase
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • From other wallets: Look for "Export" or "Recovery Phrase" in
-            settings
-          </Text>
-          <Text style={[styles.infoText, { color: theme.text.LIGHT_GREY }]}>
-            • You can paste either a 12/24 word seed phrase or a private key
-          </Text>
-        </GradientCard>
-
-        <GradientCard style={styles.warningCard}>
-          <Text
-            style={[styles.warningTitle, { color: theme.text.WARNING_ORANGE }]}
-          >
-            ⚠️ Security Warning
-          </Text>
-          <Text style={[styles.warningText, { color: theme.text.LIGHT_GREY }]}>
-            • Never share your private key with anyone
-          </Text>
-          <Text style={[styles.warningText, { color: theme.text.LIGHT_GREY }]}>
-            • Make sure you're in a secure environment
-          </Text>
-          <Text style={[styles.warningText, { color: theme.text.LIGHT_GREY }]}>
-            • Your private key will be encrypted and stored securely
-          </Text>
-        </GradientCard>
-
         <View style={styles.buttonContainer}>
           <GradientButton
             title={isImporting ? "Importing Wallet..." : "Import Wallet"}
@@ -169,13 +151,77 @@ const ImportWalletScreen = () => {
             loading={isImporting}
             style={styles.importButton}
           />
-          <GradientButton
-            title="Go Back"
-            onPress={handleGoBack}
-            variant={ButtonVariant.SECONDARY}
-            style={styles.backButton}
-          />
         </View>
+
+        <GradientCard style={styles.infoCard}>
+          <Typography
+            variant={TypographyVariant.TITLE_MEDIUM}
+            color={theme.text.SOFT_WHITE}
+            style={styles.infoTitle}
+          >
+            📋 How to find your credentials:
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.infoText}
+          >
+            • From Phantom: Settings → Show Secret Recovery Phrase
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.infoText}
+          >
+            • From Solflare: Settings → Export Private Key or Seed Phrase
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.infoText}
+          >
+            • From other wallets: Look for "Export" or "Recovery Phrase" in
+            settings
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.infoText}
+          >
+            • You can paste either a 12/24 word seed phrase or a private key
+          </Typography>
+        </GradientCard>
+
+        <GradientCard style={styles.warningCard}>
+          <Typography
+            variant={TypographyVariant.TITLE_MEDIUM}
+            color={theme.text.WARNING_ORANGE}
+            style={styles.warningTitle}
+          >
+            ⚠️ Security Warning
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.warningText}
+          >
+            • Never share your private key with anyone
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.warningText}
+          >
+            • Make sure you're in a secure environment
+          </Typography>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+            style={styles.warningText}
+          >
+            • Your private key will be encrypted and stored securely
+          </Typography>
+        </GradientCard>
       </ScrollView>
     </GradientBackground>
   );
@@ -244,10 +290,10 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: BASE_MARGIN,
   },
   buttonContainer: {
-    marginBottom: 20,
+    marginBottom: EDGE_MARGIN,
   },
   importButton: {
     marginBottom: 16,

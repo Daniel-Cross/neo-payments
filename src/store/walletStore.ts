@@ -342,14 +342,23 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   // Rename a wallet
   renameWallet: async (walletId: string, newName: string) => {
     try {
-      const { wallets } = get();
+      const { wallets, selectedWalletId } = get();
       const updatedWallets = wallets.map((wallet) =>
         wallet.id === walletId ? { ...wallet, name: newName } : wallet
       );
 
       const stored = await SecureWalletStorage.storeWallets(updatedWallets);
       if (stored) {
-        set({ wallets: updatedWallets });
+        // Update selectedWallet if it's the one being renamed
+        const updatedSelectedWallet =
+          selectedWalletId === walletId
+            ? updatedWallets.find((w) => w.id === walletId) || null
+            : null;
+
+        set({
+          wallets: updatedWallets,
+          selectedWallet: updatedSelectedWallet,
+        });
         return true;
       }
       return false;

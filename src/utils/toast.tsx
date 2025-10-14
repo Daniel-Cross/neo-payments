@@ -14,10 +14,16 @@ export enum ToastType {
 }
 
 export const toastConfig = {
-  success: ({ text1 }: ToastConfigParams<any>) => {
+  success: ({ text1, props }: ToastConfigParams<any>) => {
     const { theme } = useTheme();
     return (
-      <View style={[styles.toast, styles.toastSuccess]}>
+      <View
+        style={[
+          styles.toast,
+          styles.toastSuccess,
+          { zIndex: props?.zIndex || 9999 },
+        ]}
+      >
         <Typography
           variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.LIGHT_WHITE}
@@ -28,10 +34,16 @@ export const toastConfig = {
       </View>
     );
   },
-  error: ({ text1 }: ToastConfigParams<any>) => {
+  error: ({ text1, props }: ToastConfigParams<any>) => {
     const { theme } = useTheme();
     return (
-      <View style={[styles.toast, styles.toastError]}>
+      <View
+        style={[
+          styles.toast,
+          styles.toastError,
+          { zIndex: props?.zIndex || 9999 },
+        ]}
+      >
         <Typography
           variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.LIGHT_WHITE}
@@ -42,10 +54,16 @@ export const toastConfig = {
       </View>
     );
   },
-  warning: ({ text1 }: ToastConfigParams<any>) => {
+  warning: ({ text1, props }: ToastConfigParams<any>) => {
     const { theme } = useTheme();
     return (
-      <View style={[styles.toast, styles.toastWarning]}>
+      <View
+        style={[
+          styles.toast,
+          styles.toastWarning,
+          { zIndex: props?.zIndex || 9999 },
+        ]}
+      >
         <Typography
           variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.LIGHT_WHITE}
@@ -56,10 +74,16 @@ export const toastConfig = {
       </View>
     );
   },
-  info: ({ text1 }: ToastConfigParams<any>) => {
+  info: ({ text1, props }: ToastConfigParams<any>) => {
     const { theme } = useTheme();
     return (
-      <View style={[styles.toast, styles.toastInfo]}>
+      <View
+        style={[
+          styles.toast,
+          styles.toastInfo,
+          { zIndex: props?.zIndex || 9999 },
+        ]}
+      >
         <Typography
           variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.LIGHT_WHITE}
@@ -78,6 +102,7 @@ interface ToastConfig {
   visibilityTime?: ToastDuration;
   props?: any;
   onHide?: () => void;
+  zIndex?: number;
 }
 
 export enum ToastDuration {
@@ -92,13 +117,17 @@ const showToast = ({
   type,
   props,
   onHide,
+  zIndex,
 }: ToastConfig) => {
   Toast.show({
     type,
     text1: text,
     visibilityTime,
     autoHide: visibilityTime !== ToastDuration.Indefinite,
-    props,
+    props: {
+      ...props,
+      zIndex: zIndex || 9999,
+    },
     topOffset: 70,
     onShow: () => {
       switch (type) {
@@ -119,20 +148,46 @@ const showToast = ({
 };
 
 // Convenience functions
-export const showSuccessToast = (text: string, duration?: ToastDuration) => {
-  showToast({ type: ToastType.SUCCESS, text, visibilityTime: duration });
+export const showSuccessToast = (
+  text: string,
+  duration?: ToastDuration,
+  zIndex?: number
+) => {
+  showToast({
+    type: ToastType.SUCCESS,
+    text,
+    visibilityTime: duration,
+    zIndex,
+  });
 };
 
-export const showErrorToast = (text: string, duration?: ToastDuration) => {
-  showToast({ type: ToastType.ERROR, text, visibilityTime: duration });
+export const showErrorToast = (
+  text: string,
+  duration?: ToastDuration,
+  zIndex?: number
+) => {
+  showToast({ type: ToastType.ERROR, text, visibilityTime: duration, zIndex });
 };
 
-export const showWarningToast = (text: string, duration?: ToastDuration) => {
-  showToast({ type: ToastType.WARNING, text, visibilityTime: duration });
+export const showWarningToast = (
+  text: string,
+  duration?: ToastDuration,
+  zIndex?: number
+) => {
+  showToast({
+    type: ToastType.WARNING,
+    text,
+    visibilityTime: duration,
+    zIndex,
+  });
 };
 
-export const showInfoToast = (text: string, duration?: ToastDuration) => {
-  showToast({ type: ToastType.INFO, text, visibilityTime: duration });
+export const showInfoToast = (
+  text: string,
+  duration?: ToastDuration,
+  zIndex?: number
+) => {
+  showToast({ type: ToastType.INFO, text, visibilityTime: duration, zIndex });
 };
 
 const styles = StyleSheet.create({
