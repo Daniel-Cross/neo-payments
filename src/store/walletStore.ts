@@ -104,9 +104,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
   // Create a new wallet
   createNewWallet: async (name?: string) => {
-    set({ isLoading: true });
+    const { wallets } = get();
+    
+    // Check if secure storage is available first
+    const secureStorageAvailable = await SecureWalletStorage.isAvailable();
+    if (!secureStorageAvailable) {
+      throw new Error("Secure storage is not available on this device. Please enable device security features and try again.");
+    }
+    
+    // Don't set isLoading to true immediately to prevent flash
+    // Instead, we'll handle loading state more gracefully
     try {
-      const { wallets } = get();
       const keypair = Keypair.generate();
       const publicKey = keypair.publicKey.toString();
       const walletName = name || generateWalletName(wallets, "created");
@@ -133,9 +141,10 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       const updatedWallets = [...wallets, newWallet];
       const stored = await SecureWalletStorage.storeWallets(updatedWallets);
       if (!stored) {
-        throw new Error("Failed to store wallet securely");
+        throw new Error("Failed to store wallet securely. Please check your device's secure storage settings and try again.");
       }
 
+      // Update state atomically to prevent flash
       set({
         wallets: updatedWallets,
         selectedWalletId: newWallet.id,

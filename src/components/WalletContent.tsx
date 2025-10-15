@@ -114,6 +114,7 @@ const WalletContent = () => {
         visible={isWalletModalVisible}
         onClose={() => setIsWalletModalVisible(false)}
       />
+
     </View>
   );
 };

@@ -29,12 +29,12 @@ export default {
       },
     },
     android: {
+      package: "com.appforge.neo",
       adaptiveIcon: {
         foregroundImage: "./assets/images/android.png",
         backgroundColor: "#2B003B",
-        versionCode: parseInt(BUILD_NUMBER, 10),
-        package: "com.appforge.neo",
       },
+      versionCode: parseInt(BUILD_NUMBER, 10),
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       permissions: ["USE_BIOMETRIC", "USE_FINGERPRINT"],

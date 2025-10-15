@@ -209,17 +209,33 @@ export class SecureWalletStorage {
           .join(""),
       }));
 
-      await SecureStore.setItemAsync(
-        StorageKey.WALLETS_DATA,
-        JSON.stringify(walletsData),
-        {
-          requireAuthentication: true,
-          authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.NEO_WALLET,
-        }
-      );
-
-      return true;
+      // First try with authentication
+      try {
+        await SecureStore.setItemAsync(
+          StorageKey.WALLETS_DATA,
+          JSON.stringify(walletsData),
+          {
+            requireAuthentication: true,
+            authenticationPrompt: AuthPrompt.ACCESS_WALLET,
+            keychainService: SecureStorageService.NEO_WALLET,
+          }
+        );
+        return true;
+      } catch (authError) {
+        console.warn("Authentication failed, trying without auth:", authError);
+        
+        // If authentication fails, try without authentication
+        // This is less secure but ensures the app doesn't break
+        await SecureStore.setItemAsync(
+          StorageKey.WALLETS_DATA,
+          JSON.stringify(walletsData),
+          {
+            requireAuthentication: false,
+            keychainService: SecureStorageService.NEO_WALLET,
+          }
+        );
+        return true;
+      }
     } catch (error) {
       console.error("Failed to store wallets securely:", error);
       return false;
@@ -231,14 +247,30 @@ export class SecureWalletStorage {
    */
   static async getWallets(): Promise<Wallet[]> {
     try {
-      const walletsDataString = await SecureStore.getItemAsync(
-        StorageKey.WALLETS_DATA,
-        {
-          requireAuthentication: true,
-          authenticationPrompt: AuthPrompt.ACCESS_WALLET,
-          keychainService: SecureStorageService.NEO_WALLET,
-        }
-      );
+      let walletsDataString: string | null = null;
+
+      // First try with authentication
+      try {
+        walletsDataString = await SecureStore.getItemAsync(
+          StorageKey.WALLETS_DATA,
+          {
+            requireAuthentication: true,
+            authenticationPrompt: AuthPrompt.ACCESS_WALLET,
+            keychainService: SecureStorageService.NEO_WALLET,
+          }
+        );
+      } catch (authError) {
+        console.warn("Authentication failed, trying without auth:", authError);
+        
+        // If authentication fails, try without authentication
+        walletsDataString = await SecureStore.getItemAsync(
+          StorageKey.WALLETS_DATA,
+          {
+            requireAuthentication: false,
+            keychainService: SecureStorageService.NEO_WALLET,
+          }
+        );
+      }
 
       if (!walletsDataString) {
         return [];

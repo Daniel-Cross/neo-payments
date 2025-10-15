@@ -16,18 +16,14 @@ import { useWalletStore } from "../store/walletStore";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
 import { BASE_MARGIN, EDGE_MARGIN } from "../constants/styles";
+import { isSeedPhrase } from "../utils/keyDerivation";
 
 const ImportWalletScreen = () => {
   const { theme } = useTheme();
   const { importWallet, importWalletFromSeedPhrase, isLoading } =
     useWalletStore();
   const [inputText, setInputText] = useState("");
-  const [isImporting, setIsImporting] = useState(false);
 
-  const isSeedPhrase = (text: string) => {
-    const words = text.trim().split(/\s+/);
-    return words.length === 12 || words.length === 24;
-  };
 
   const handleImportWallet = async () => {
     if (!inputText.trim()) {
@@ -39,7 +35,6 @@ const ImportWalletScreen = () => {
       return;
     }
 
-    setIsImporting(true);
     try {
       let success = false;
       const trimmedInput = inputText.trim();
@@ -76,13 +71,7 @@ const ImportWalletScreen = () => {
         text1: "Error",
         text2: "An unexpected error occurred. Please try again.",
       });
-    } finally {
-      setIsImporting(false);
     }
-  };
-
-  const handleGoBack = () => {
-    router.back();
   };
 
   return (
@@ -144,11 +133,11 @@ const ImportWalletScreen = () => {
         </GradientCard>
         <View style={styles.buttonContainer}>
           <GradientButton
-            title={isImporting ? "Importing Wallet..." : "Import Wallet"}
+            title={isLoading ? "Importing Wallet..." : "Import Wallet"}
             onPress={handleImportWallet}
             variant={ButtonVariant.PRIMARY}
-            disabled={isImporting || !inputText.trim()}
-            loading={isImporting}
+            disabled={isLoading || !inputText.trim()}
+            loading={isLoading}
             style={styles.importButton}
           />
         </View>
@@ -296,9 +285,6 @@ const styles = StyleSheet.create({
     marginBottom: EDGE_MARGIN,
   },
   importButton: {
-    marginBottom: 16,
-  },
-  backButton: {
     marginBottom: 16,
   },
 });
