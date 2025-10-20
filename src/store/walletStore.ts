@@ -81,8 +81,6 @@ export interface WalletState {
   
   // Fee monitoring methods
   loadOptimalFee: () => Promise<void>;
-  startFeeMonitoring: () => NodeJS.Timeout;
-  stopFeeMonitoring: () => void;
 }
 
 // Helper function to generate wallet name
@@ -748,21 +746,4 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
-  startFeeMonitoring: () => {
-    const { loadOptimalFee } = get();
-    
-    // Load initial optimal fee
-    loadOptimalFee();
-    
-    // Set up interval for auto-refresh every 12 seconds
-    const interval = setInterval(() => {
-      loadOptimalFee();
-    }, 12000);
-
-    return interval;
-  },
-
-  stopFeeMonitoring: () => {
-    // Components will handle their own cleanup
-  },
 }));

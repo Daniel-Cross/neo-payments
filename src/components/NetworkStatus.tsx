@@ -1,8 +1,7 @@
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
 import { TypographyVariant, NetworkCongestion } from '../constants/enums';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 interface NetworkStatusProps {
   networkCongestion: NetworkCongestion;
@@ -10,7 +9,6 @@ interface NetworkStatusProps {
   feeInSOL: number;
   countdown: number;
   isRefreshing: boolean;
-  onRefresh: () => void;
   style?: any;
 }
 
@@ -20,7 +18,6 @@ const NetworkStatus = ({
   feeInSOL,
   countdown,
   isRefreshing,
-  onRefresh,
   style,
 }: NetworkStatusProps) => {
   const { theme } = useTheme();
@@ -37,66 +34,60 @@ const NetworkStatus = ({
     }
   };
 
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.header}>
-        <Typography 
-          variant={TypographyVariant.LABEL_MEDIUM} 
+        <Typography
+          variant={TypographyVariant.LABEL_MEDIUM}
           color={theme.text.LIGHT_GREY}
-          weight="600"
+          weight='600'
           style={styles.title}
         >
           Network Status
         </Typography>
-        <TouchableOpacity 
-          onPress={onRefresh}
-          disabled={isRefreshing}
-          style={styles.refreshButton}
-        >
-          <MaterialCommunityIcons 
-            name={isRefreshing ? "loading" : "refresh"} 
-            size={16} 
-            color={theme.text.LIGHT_GREY}
-          />
-        </TouchableOpacity>
       </View>
-      
+
       <View style={styles.networkInfo}>
         <View style={styles.congestionContainer}>
-          <View style={[
-            styles.congestionIndicator,
-            { backgroundColor: getCongestionColor(networkCongestion) }
-          ]} />
-          <Typography 
-            variant={TypographyVariant.CAPTION} 
+          <View
+            style={[
+              styles.congestionIndicator,
+              { backgroundColor: getCongestionColor(networkCongestion) },
+            ]}
+          />
+          <Typography
+            variant={TypographyVariant.CAPTION}
             color={theme.text.LIGHT_GREY}
             style={styles.congestionText}
           >
             Network: {networkCongestion.toUpperCase()}
           </Typography>
         </View>
-        
-        <Typography 
-          variant={TypographyVariant.CAPTION} 
+
+        <Typography
+          variant={TypographyVariant.CAPTION}
           color={theme.text.SUCCESS_GREEN}
           style={styles.estimatedTime}
         >
           ⚡ Estimated: {estimatedTime}
         </Typography>
 
-        <Typography 
-          variant={TypographyVariant.CAPTION} 
-          color={theme.text.LIGHT_GREY}
-        >
+        <Typography variant={TypographyVariant.CAPTION} color={theme.text.LIGHT_GREY}>
           Fee: {feeInSOL.toFixed(6)} SOL
         </Typography>
 
-        <Typography 
-          variant={TypographyVariant.CAPTION} 
-          color={theme.text.DARK_GREY}
-        >
-          Next refresh in {countdown}s
-        </Typography>
+        <View style={styles.refreshContainer}>
+          {isRefreshing ? (
+            <Typography variant={TypographyVariant.CAPTION} color={theme.text.LIGHT_GREY}>
+              Getting latest gas fees...
+            </Typography>
+          ) : (
+            <Typography variant={TypographyVariant.CAPTION} color={theme.text.DARK_GREY}>
+              Next refresh in {countdown}s
+            </Typography>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -118,9 +109,6 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
   },
-  refreshButton: {
-    padding: 4,
-  },
   networkInfo: {
     gap: 8,
   },
@@ -139,6 +127,11 @@ const styles = StyleSheet.create({
   },
   estimatedTime: {
     fontWeight: '600',
+  },
+  refreshContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
 

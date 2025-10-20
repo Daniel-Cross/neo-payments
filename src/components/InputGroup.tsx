@@ -1,8 +1,9 @@
-import { View, TextInput, StyleSheet, TextInputProps } from 'react-native';
+import { View, TextInput, StyleSheet, TextInputProps, TouchableOpacity } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
 import { TypographyVariant } from '../constants/enums';
 import { BASE_MARGIN, EDGE_MARGIN } from '../constants/styles';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 interface InputGroupProps {
   label: string;
@@ -18,6 +19,8 @@ interface InputGroupProps {
   autoCorrect?: boolean;
   style?: any;
   inputStyle?: any;
+  showPasteButton?: boolean;
+  onPaste?: () => void;
 }
 
 const InputGroup = ({
@@ -34,6 +37,8 @@ const InputGroup = ({
   autoCorrect = true,
   style,
   inputStyle,
+  showPasteButton = false,
+  onPaste,
 }: InputGroupProps) => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -53,23 +58,40 @@ const InputGroup = ({
         {label}
       </Typography>
       
-      <TextInput
-        style={[
-          styles.input,
-          hasValue && hasError && styles.inputError,
-          hasValue && hasSuccess && styles.inputSuccess,
-          inputStyle,
-        ]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={theme.text.LIGHT_GREY}
-        multiline={multiline}
-        maxLength={maxLength}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={autoCorrect}
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[
+            styles.input,
+            hasValue && hasError && styles.inputError,
+            hasValue && hasSuccess && styles.inputSuccess,
+            showPasteButton && styles.inputWithButton,
+            inputStyle,
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={theme.text.LIGHT_GREY}
+          multiline={multiline}
+          maxLength={maxLength}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+        />
+        
+        {showPasteButton && onPaste && (
+          <TouchableOpacity
+            onPress={onPaste}
+            style={styles.pasteButton}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="content-paste"
+              size={20}
+              color={theme.text.SOFT_WHITE}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
       
       {hasValue && hasError && (
         <Typography 
@@ -101,7 +123,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   label: {
     marginBottom: BASE_MARGIN,
   },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: theme.background.SEMI_TRANSPARENT_WHITE,
     borderRadius: theme.borderRadius.medium,
@@ -110,6 +138,17 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 16,
     color: theme.text.SOFT_WHITE,
     backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
+  },
+  inputWithButton: {
+    marginRight: 0,
+  },
+  pasteButton: {
+    height: 44,
+    width: 44,
+    borderRadius: 8,
+    backgroundColor: theme.colors.NEON_PINK,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inputError: {
     borderColor: theme.text.ERROR_RED,

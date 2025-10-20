@@ -15,6 +15,7 @@ import { useWalletManagement } from "../hooks/useWalletManagement";
 import WalletItem from "./WalletItem";
 import CurrentWalletSection from "./CurrentWalletSection";
 import ImportWalletModal from "./ImportWalletModal";
+import CloseButton from "./CloseButton";
 
 interface WalletManagementModalProps {
   visible: boolean;
@@ -93,13 +94,7 @@ export default function WalletManagementModal({
           >
             Wallet Management
           </Typography>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <MaterialCommunityIcons
-              name="close"
-              size={24}
-              color={theme.text.SOFT_WHITE}
-            />
-          </TouchableOpacity>
+          <CloseButton onPress={onClose} />
         </View>
 
         <View style={styles.content}>
@@ -286,9 +281,6 @@ const createStyles = (theme: any) =>
       paddingHorizontal: EDGE_MARGIN,
       paddingTop: 60,
       paddingBottom: 20,
-    },
-    closeButton: {
-      padding: 8,
     },
     content: {
       flex: 1,

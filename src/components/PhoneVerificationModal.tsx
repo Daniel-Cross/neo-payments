@@ -4,7 +4,6 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { Typography } from "./Typography";
@@ -14,7 +13,8 @@ import { EDGE_MARGIN } from "../constants/styles";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useState, useEffect } from "react";
 import { authService } from "../services/supabase";
-import { showSuccessToast, showErrorToast } from "../utils/toast";
+import { showSuccessToast } from "../utils/toast";
+import CloseButton from "./CloseButton";
 
 interface PhoneVerificationModalProps {
   visible: boolean;
@@ -198,13 +198,7 @@ export default function PhoneVerificationModal({
             >
               {step === "phone" ? "Verify Phone Number" : "Enter Verification Code"}
             </Typography>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <MaterialCommunityIcons
-                name="close"
-                size={24}
-                color={theme.text.SOFT_WHITE}
-              />
-            </TouchableOpacity>
+            <CloseButton onPress={handleClose} />
           </View>
           <Typography
             variant={TypographyVariant.BODY_MEDIUM}
@@ -425,10 +419,6 @@ const createStyles = (theme: any) =>
     title: {
       flex: 1,
       textAlign: "left",
-    },
-    closeButton: {
-      padding: 8,
-      marginLeft: 16,
     },
     subtitle: {
       textAlign: "center",

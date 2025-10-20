@@ -4,6 +4,7 @@ import { Typography } from "./Typography";
 import { TypographyVariant } from "../constants/enums";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Clipboard from "expo-clipboard";
+import CloseButton from "./CloseButton";
 
 interface SecretDisplayModalProps {
   visible: boolean;
@@ -53,13 +54,7 @@ export default function SecretDisplayModal({
           >
             {secretType === "privateKey" ? "Private Key" : "Seed Phrase"}
           </Typography>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <MaterialCommunityIcons
-              name="close"
-              size={24}
-              color={theme.text.SOFT_WHITE}
-            />
-          </TouchableOpacity>
+          <CloseButton onPress={onClose} />
         </View>
 
         <Typography
@@ -119,9 +114,6 @@ const styles = StyleSheet.create({
   },
   secretModalTitle: {
     flex: 1,
-  },
-  closeButton: {
-    padding: 8,
   },
   secretWarning: {
     marginBottom: 20,

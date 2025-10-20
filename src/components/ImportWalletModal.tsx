@@ -16,6 +16,7 @@ import { EDGE_MARGIN } from "../constants/styles";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useState, useEffect, useCallback } from "react";
 import { derivePublicKeyFromInput, isSeedPhrase } from "../utils/keyDerivation";
+import CloseButton from "./CloseButton";
 
 interface ImportWalletModalProps {
   visible: boolean;
@@ -197,13 +198,7 @@ export default function ImportWalletModal({
               >
                 Import Wallet
               </Typography>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <MaterialCommunityIcons
-                  name="close"
-                  size={24}
-                  color={theme.text.SOFT_WHITE}
-                />
-              </TouchableOpacity>
+              <CloseButton onPress={handleClose} />
             </View>
             <Typography
               variant={TypographyVariant.BODY_MEDIUM}
@@ -383,10 +378,6 @@ const createStyles = (theme: any) =>
     title: {
       flex: 1,
       textAlign: "left",
-    },
-    closeButton: {
-      padding: 8,
-      marginLeft: 16,
     },
     subtitle: {
       textAlign: "center",

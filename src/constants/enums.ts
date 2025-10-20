@@ -94,6 +94,7 @@ export enum AlertTitle {
   SECURE_STORAGE_UNAVAILABLE = "Secure Storage Unavailable",
   DISCONNECT_WALLET = "Disconnect Wallet",
   PRIVATE_KEY = "Private Key",
+  CONFIRM_TRANSACTION = "Confirm Transaction",
 }
 
 export enum AlertMessage {
@@ -108,6 +109,9 @@ export enum AlertMessage {
   DISCONNECT_CONFIRMATION = "Are you sure you want to disconnect your wallet? This will remove it from secure storage.",
   EXPORT_PRIVATE_KEY_ERROR = "Failed to export private key. Please try again.",
   PRIVATE_KEY_WARNING = "Keep this safe and never share it with anyone!",
+  CHECK_INPUTS_AND_TRY_AGAIN = "Please check your inputs and try again",
+  INSUFFICIENT_BALANCE = "Insufficient balance to cover amount and fees",
+  TRANSACTION_FAILED = "Transaction failed",
 }
 
 export enum ButtonText {
@@ -124,6 +128,8 @@ export enum ButtonText {
   IMPORT_EXISTING_WALLET = "Import Existing Wallet",
   SECURE_STORAGE_UNAVAILABLE = "Secure Storage Unavailable",
   IMPORT_UNAVAILABLE = "Import Unavailable",
+  SENDING = "Sending...",
+  SEND = "Send",
 }
 
 export enum ScreenTitle {
@@ -134,6 +140,7 @@ export enum ScreenTitle {
 
 export enum PlaceholderText {
   PRIVATE_KEY_INPUT = "Paste your private key here...",
+  SOLANA_ADDRESS = "Enter Solana address...",
 }
 
 export enum LabelText {
@@ -141,6 +148,10 @@ export enum LabelText {
   WALLET_ADDRESS = "Wallet Address:",
   ENTER_PRIVATE_KEY = "Enter your private key:",
   WELCOME_SUBTITLE = "Connect your Solana wallet or create a new one to start sending and receiving SOL",
+  RECIPIENT_ADDRESS = "Recipient Address",
+  INSUFFICIENT_BALANCE = "Insufficient balance",
+  INVALID_AMOUNT = "Invalid amount",
+  INVALID_SOLANA_ADDRESS = "Invalid Solana address",
 }
 
 // Authentication prompts
@@ -235,4 +246,22 @@ export enum Currency {
   EUR = "EUR",
   GBP = "GBP",
   JPY = "JPY",
+}
+
+// Recipient selection enums
+export enum RecipientType {
+  WALLET_ADDRESS = "wallet_address",
+  CONTACTS = "contacts",
+  FAVORITES = "favorites",
+}
+
+export enum RecipientSelectionText {
+  SELECT_RECIPIENT = "Select Recipient",
+  WALLET_ADDRESS = "Wallet Address",
+  CONTACTS = "Contacts",
+  FAVORITES = "Favorites",
+  NO_CONTACTS = "No contacts found",
+  NO_FAVORITES = "No favorites found",
+  ADD_TO_FAVORITES = "Add to Favorites",
+  REMOVE_FROM_FAVORITES = "Remove from Favorites",
 }
