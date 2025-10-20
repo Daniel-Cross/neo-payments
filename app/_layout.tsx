@@ -70,6 +70,7 @@ function AppNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="create-wallet" />
       <Stack.Screen name="import-wallet" />
+      <Stack.Screen name="receive-sol" />
     </Stack>
   );
 }

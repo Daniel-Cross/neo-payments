@@ -20,6 +20,7 @@ import {
   testSecureStorageHandler,
   refreshBalanceHandler,
 } from "../utils/walletHandlers";
+import SendSolModal from "../components/SendSolModal";
 import {
   Typography,
   DisplaySmall,
@@ -61,6 +62,7 @@ export default function WalletScreen() {
   const [privateKeyInput, setPrivateKeyInput] = useState("");
   const [showImportForm, setShowImportForm] = useState(false);
   const [secureStorageAvailable, setSecureStorageAvailable] = useState(true);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   // Check secure storage availability on mount
   useEffect(() => {
@@ -113,7 +115,8 @@ export default function WalletScreen() {
 
   if (isConnected && keypair && publicKey) {
     return (
-      <ScrollView style={styles.container}>
+      <View style={styles.container}>
+        <ScrollView style={styles.container}>
         <View style={styles.header}>
           <DisplaySmall color={theme.text.SOFT_WHITE}>
             {ScreenTitle.MY_WALLET}
@@ -183,9 +186,7 @@ export default function WalletScreen() {
         <View style={styles.actionsContainer}>
           <GradientButton
             title={ButtonText.SEND_SOL}
-            onPress={() => {
-              /* TODO: Navigate to send screen */
-            }}
+            onPress={() => setShowSendModal(true)}
             variant={ButtonVariant.PRIMARY}
             size={ButtonSize.LARGE}
             style={styles.actionButton}
@@ -193,14 +194,21 @@ export default function WalletScreen() {
           <GradientButton
             title={ButtonText.RECEIVE_SOL}
             onPress={() => {
-              /* TODO: Navigate to receive screen */
+              /* TODO: Implement receive functionality */
             }}
             variant={ButtonVariant.PRIMARY}
             size={ButtonSize.LARGE}
             style={styles.actionButton}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+        
+        {/* Send SOL Modal */}
+        <SendSolModal
+          visible={showSendModal}
+          onClose={() => setShowSendModal(false)}
+        />
+      </View>
     );
   }
 

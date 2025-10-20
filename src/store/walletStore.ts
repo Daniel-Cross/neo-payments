@@ -1,10 +1,11 @@
 import { create } from "zustand";
-import { Keypair, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 import { SecureWalletStorage } from "../utils/secureStorage";
-import { SolanaNetwork, ConnectionCommitment } from "../constants/enums";
+import { SolanaNetwork, ConnectionCommitment, FeeOption, NetworkCongestion, Currency } from "../constants/enums";
 import { priceService } from "../utils/priceService";
+import { transactionService, TransferParams, TransactionResult } from "../services/transactionService";
 
 // Solana mainnet connection
 const connection = new Connection(
@@ -33,7 +34,19 @@ export interface WalletState {
   solPrice: number;
   priceLastUpdated: number;
   isPriceLoading: boolean;
-  selectedCurrency: string; // Currency code (e.g., 'USD', 'EUR', 'GBP', 'JPY')
+  selectedCurrency: Currency;
+
+  // Fee monitoring data
+  optimalFee: {
+    baseFee: number;
+    priorityFee: number;
+    totalFee: number;
+    feeInSOL: number;
+    networkCongestion: NetworkCongestion;
+    estimatedTime: string;
+    lastUpdated: number;
+  } | null;
+  isRefreshingFees: boolean;
 
   // Computed properties
   selectedWallet: Wallet | null;
@@ -56,11 +69,20 @@ export interface WalletState {
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
   updateSolPrice: () => Promise<void>;
-  setCurrency: (currency: string) => void;
+  setCurrency: (currency: Currency) => void;
   exportPrivateKey: () => Promise<string | null>;
   exportSeedPhrase: () => Promise<string | null>;
   checkSecureStorage: () => Promise<boolean>;
   testSecureStorage: () => Promise<{ basicTest: boolean; authTest: boolean }>;
+  
+  // Transaction methods
+  sendSOL: (to: string, amount: number, memo?: string) => Promise<TransactionResult>;
+  getTransactionHistory: () => Promise<any[]>;
+  
+  // Fee monitoring methods
+  loadOptimalFee: () => Promise<void>;
+  startFeeMonitoring: () => NodeJS.Timeout;
+  stopFeeMonitoring: () => void;
 }
 
 // Helper function to generate wallet name
@@ -93,7 +115,11 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   solPrice: 100, // Default fallback price
   priceLastUpdated: 0,
   isPriceLoading: false,
-  selectedCurrency: "USD", // Default to USD
+  selectedCurrency: Currency.USD,
+
+  // Fee monitoring data
+  optimalFee: null,
+  isRefreshingFees: false,
 
   // Computed properties
   selectedWallet: null as Wallet | null,
@@ -641,9 +667,103 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   },
 
   // Set selected currency
-  setCurrency: (currency: string) => {
+  setCurrency: (currency: Currency) => {
     set({ selectedCurrency: currency });
     // Update price with new currency
     get().updateSolPrice();
+  },
+
+  // Send SOL transaction
+  sendSOL: async (to: string, amount: number, memo?: string) => {
+    const { selectedWallet } = get();
+    
+    if (!selectedWallet) {
+      throw new Error("No wallet selected");
+    }
+
+    try {
+      const transferParams: TransferParams = {
+        from: new PublicKey(selectedWallet.publicKey),
+        to: new PublicKey(to),
+        amount,
+        memo,
+      };
+
+      const result = await transactionService.transferSOL(
+        transferParams,
+        selectedWallet.keypair,
+        true // Use versioned transaction for better performance
+      );
+
+      // Update balance after successful transaction
+      if (result.success) {
+        const { updateBalance } = get();
+        await updateBalance();
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Failed to send SOL:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Transaction failed",
+      };
+    }
+  },
+
+  // Get transaction history
+  getTransactionHistory: async () => {
+    const { selectedWallet } = get();
+    
+    if (!selectedWallet) {
+      return [];
+    }
+
+    try {
+      const publicKey = new PublicKey(selectedWallet.publicKey);
+      return await transactionService.getTransactionHistory(publicKey);
+    } catch (error) {
+      console.error("Failed to get transaction history:", error);
+      return [];
+    }
+  },
+
+  // Fee monitoring methods
+  loadOptimalFee: async () => {
+    const { isRefreshingFees } = get();
+    
+    // Prevent multiple simultaneous requests
+    if (isRefreshingFees) return;
+
+    set({ isRefreshingFees: true });
+
+    try {
+      const optimalFee = await transactionService.getOptimalFee();
+      set({
+        optimalFee,
+        isRefreshingFees: false,
+      });
+    } catch (error) {
+      console.warn("Failed to load optimal fee:", error);
+      set({ isRefreshingFees: false });
+    }
+  },
+
+  startFeeMonitoring: () => {
+    const { loadOptimalFee } = get();
+    
+    // Load initial optimal fee
+    loadOptimalFee();
+    
+    // Set up interval for auto-refresh every 12 seconds
+    const interval = setInterval(() => {
+      loadOptimalFee();
+    }, 12000);
+
+    return interval;
+  },
+
+  stopFeeMonitoring: () => {
+    // Components will handle their own cleanup
   },
 }));

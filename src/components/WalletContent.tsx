@@ -9,6 +9,7 @@ import { EDGE_MARGIN } from "../constants/styles";
 import WalletManagementModal from "./WalletManagementModal";
 import WalletInfoCard from "./WalletInfoCard";
 import UserInfoCard from "./UserInfoCard";
+import SendSolModal from "./SendSolModal";
 
 const WalletContent = () => {
   const { theme } = useTheme();
@@ -27,6 +28,7 @@ const WalletContent = () => {
   } = useWalletStore();
 
   const [isWalletModalVisible, setIsWalletModalVisible] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   useEffect(() => {
     // Update balance and price when component mounts
@@ -45,8 +47,7 @@ const WalletContent = () => {
   ]);
 
   const handleSend = () => {
-    // TODO: Navigate to send screen
-    console.log("Send button pressed");
+    setShowSendModal(true);
   };
 
   const handleScan = () => {
@@ -113,6 +114,12 @@ const WalletContent = () => {
       <WalletManagementModal
         visible={isWalletModalVisible}
         onClose={() => setIsWalletModalVisible(false)}
+      />
+
+      {/* Send SOL Modal */}
+      <SendSolModal
+        visible={showSendModal}
+        onClose={() => setShowSendModal(false)}
       />
 
     </View>

@@ -198,3 +198,41 @@ export enum TypographyAlign {
   RIGHT = "right",
   JUSTIFY = "justify",
 }
+
+export enum FeeOption {
+  SLOW = "slow",
+  STANDARD = "standard",
+  FAST = "fast",
+}
+
+export enum NetworkCongestion {
+  LOW = "low",
+  MEDIUM = "medium",
+  HIGH = "high",
+}
+
+export enum PrivacyLevel {
+  STANDARD = "standard",
+  ENHANCED = "enhanced",
+  MAXIMUM = "maximum",
+}
+
+export enum MemoPrivacy {
+  NONE = "none",
+  ENCRYPTED = "encrypted",
+  HASHED = "hashed",
+}
+
+// Input mode enums
+export enum InputMode {
+  CURRENCY = "currency",
+  SOL = "sol",
+}
+
+// Currency enums
+export enum Currency {
+  USD = "USD",
+  EUR = "EUR",
+  GBP = "GBP",
+  JPY = "JPY",
+}

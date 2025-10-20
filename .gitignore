@@ -49,3 +49,6 @@ build-*.tar.gz
 **/Frameworks/
 **/*.framework/
 **/*.dylib
+
+# Supabase
+.env
