@@ -12,11 +12,9 @@ import { GradientButton } from "./GradientButton";
 import { EDGE_MARGIN } from "../constants/styles";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useWalletManagement } from "../hooks/useWalletManagement";
-import { useState } from "react";
 import WalletItem from "./WalletItem";
 import CurrentWalletSection from "./CurrentWalletSection";
 import ImportWalletModal from "./ImportWalletModal";
-import BuySolanaModal from "./BuySolanaModal";
 
 interface WalletManagementModalProps {
   visible: boolean;
@@ -29,7 +27,6 @@ export default function WalletManagementModal({
 }: WalletManagementModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const [isBuyModalVisible, setIsBuyModalVisible] = useState(false);
   const {
     wallets,
     selectedWallet,
@@ -60,15 +57,6 @@ export default function WalletManagementModal({
     closeSecretModal,
   } = useWalletManagement();
 
-  const handleBuySolana = () => {
-    setIsBuyModalVisible(true);
-  };
-
-  const handleBuySolanaConfirm = (amount: number, paymentMethod: string) => {
-    // TODO: Integrate with payment provider (MoonPay, Ramp, etc.)
-    console.log(`Buying $${amount} worth of SOL via ${paymentMethod}`);
-    setIsBuyModalVisible(false);
-  };
 
   const renderWalletItem = ({
     item: wallet,
@@ -127,7 +115,6 @@ export default function WalletManagementModal({
             onViewPrivateKey={handleViewPrivateKey}
             onViewSeedPhrase={handleViewSeedPhrase}
             onNameChange={setNewWalletName}
-            onBuySolana={handleBuySolana}
           />
 
           {/* All Wallets Section Header */}
@@ -282,12 +269,6 @@ export default function WalletManagementModal({
           onClose={closeImportModal}
         />
 
-        {/* Buy Solana Modal */}
-        <BuySolanaModal
-          visible={isBuyModalVisible}
-          onClose={() => setIsBuyModalVisible(false)}
-          onBuySolana={handleBuySolanaConfirm}
-        />
       </View>
     </Modal>
   );

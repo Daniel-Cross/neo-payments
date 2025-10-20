@@ -1,8 +1,8 @@
-import React from 'react';
 import { View, TextInput, StyleSheet, TextInputProps } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
 import { TypographyVariant } from '../constants/enums';
+import { BASE_MARGIN, EDGE_MARGIN } from '../constants/styles';
 
 interface InputGroupProps {
   label: string;
@@ -20,7 +20,7 @@ interface InputGroupProps {
   inputStyle?: any;
 }
 
-export const InputGroup: React.FC<InputGroupProps> = ({
+const InputGroup = ({
   label,
   value,
   onChangeText,
@@ -34,8 +34,9 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   autoCorrect = true,
   style,
   inputStyle,
-}) => {
+}: InputGroupProps) => {
   const { theme } = useTheme();
+  const styles = createStyles(theme);
   
   const hasError = Boolean(error);
   const hasSuccess = Boolean(success);
@@ -93,35 +94,37 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: EDGE_MARGIN,
   },
   label: {
-    marginBottom: 8,
+    marginBottom: BASE_MARGIN,
   },
   input: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: theme.background.SEMI_TRANSPARENT_WHITE,
+    borderRadius: theme.borderRadius.medium,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     fontSize: 16,
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: theme.text.SOFT_WHITE,
+    backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
   },
   inputError: {
-    borderColor: '#FF6B6B',
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderColor: theme.text.ERROR_RED,
+    backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
   },
   inputSuccess: {
-    borderColor: '#51CF66',
-    backgroundColor: 'rgba(81, 207, 102, 0.1)',
+    borderColor: theme.text.SUCCESS_GREEN,
+    backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
   },
   errorText: {
-    marginTop: 4,
+    marginTop: BASE_MARGIN,
   },
   successText: {
-    marginTop: 4,
+    marginTop: BASE_MARGIN,
   },
 });
+
+export default InputGroup;

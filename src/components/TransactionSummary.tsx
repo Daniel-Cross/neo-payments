@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
@@ -16,7 +15,7 @@ interface TransactionSummaryProps {
   style?: any;
 }
 
-export const TransactionSummary: React.FC<TransactionSummaryProps> = ({
+const TransactionSummary = ({
   inputMode,
   selectedCurrency,
   numAmount,
@@ -26,7 +25,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({
   balance,
   solToCurrency,
   style,
-}) => {
+}: TransactionSummaryProps) => {
   const { theme } = useTheme();
 
   const hasInsufficientBalance = totalCost > balance;
@@ -132,3 +131,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default TransactionSummary;

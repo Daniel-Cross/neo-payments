@@ -1,4 +1,3 @@
-import React from "react";
 import { View, StyleSheet, Image } from "react-native";
 
 export enum LogoSize {
@@ -11,7 +10,7 @@ interface LogoProps {
   size?: LogoSize;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = LogoSize.MEDIUM }) => {
+const Logo = ({ size = LogoSize.MEDIUM }: LogoProps) => {
   const getSizeStyles = () => {
     switch (size) {
       case LogoSize.SMALL:

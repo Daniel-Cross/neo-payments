@@ -1,4 +1,4 @@
-import { StyleSheet, ViewStyle } from "react-native";
+import { ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../contexts/ThemeContext";
 import { CardVariant } from "../constants/enums";
@@ -32,7 +32,7 @@ export const GradientCard = ({
         return {
           ...baseStyles,
           borderWidth: 1,
-          borderColor: "rgba(255, 255, 255, 0.1)",
+          borderColor: theme.background.SEMI_TRANSPARENT_WHITE,
         };
       default:
         return baseStyles;
@@ -46,15 +46,10 @@ export const GradientCard = ({
       colors={theme.gradients.CARD.colors as [string, string, ...string[]]}
       start={theme.gradients.CARD.start}
       end={theme.gradients.CARD.end}
-      style={[styles.container, cardStyles, style]}
+      style={[cardStyles, style]}
     >
       {children}
     </LinearGradient>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    // Additional styles can be added here
-  },
-});

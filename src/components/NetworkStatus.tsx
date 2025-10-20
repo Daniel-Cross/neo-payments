@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
@@ -15,7 +14,7 @@ interface NetworkStatusProps {
   style?: any;
 }
 
-export const NetworkStatus: React.FC<NetworkStatusProps> = ({
+const NetworkStatus = ({
   networkCongestion,
   estimatedTime,
   feeInSOL,
@@ -23,7 +22,7 @@ export const NetworkStatus: React.FC<NetworkStatusProps> = ({
   isRefreshing,
   onRefresh,
   style,
-}) => {
+}: NetworkStatusProps) => {
   const { theme } = useTheme();
 
   const getCongestionColor = (congestion: NetworkCongestion) => {
@@ -142,3 +141,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default NetworkStatus;

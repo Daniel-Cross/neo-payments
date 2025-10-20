@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
@@ -16,12 +15,12 @@ interface ToggleButtonGroupProps {
   style?: any;
 }
 
-export const ToggleButtonGroup: React.FC<ToggleButtonGroupProps> = ({
+const ToggleButtonGroup = ({
   options,
   selectedValue,
   onValueChange,
   style,
-}) => {
+}: ToggleButtonGroupProps) => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
@@ -69,3 +68,5 @@ const createStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.NEON_PINK,
   },
 });
+
+export default ToggleButtonGroup;

@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
@@ -10,10 +9,10 @@ interface PrivacyNoticeProps {
   style?: any;
 }
 
-export const PrivacyNotice: React.FC<PrivacyNoticeProps> = ({
+const PrivacyNotice = ({
   message,
   style,
-}) => {
+}: PrivacyNoticeProps) => {
   const { theme } = useTheme();
 
   return (
@@ -49,3 +48,5 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+export default PrivacyNotice;

@@ -409,7 +409,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       const { wallets, selectedWalletId } = get();
       const updatedWallets = wallets.filter((wallet) => wallet.id !== walletId);
 
-      // If we're deleting the selected wallet, select another one or disconnect
       let newSelectedWalletId = selectedWalletId;
       if (selectedWalletId === walletId) {
         newSelectedWalletId =

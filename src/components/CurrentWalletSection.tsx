@@ -24,7 +24,6 @@ interface CurrentWalletSectionProps {
   onViewPrivateKey: () => void;
   onViewSeedPhrase: () => void;
   onNameChange: (name: string) => void;
-  onBuySolana: () => void;
 }
 
 export default function CurrentWalletSection({
@@ -38,7 +37,6 @@ export default function CurrentWalletSection({
   onViewPrivateKey,
   onViewSeedPhrase,
   onNameChange,
-  onBuySolana,
 }: CurrentWalletSectionProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -134,20 +132,6 @@ export default function CurrentWalletSection({
         />
       </TouchableOpacity>
 
-      {/* Buy Solana Button */}
-      <GradientButton
-        title="Buy Solana"
-        onPress={onBuySolana}
-        variant={ButtonVariant.PRIMARY}
-        style={styles.buyButton}
-        icon={
-          <MaterialCommunityIcons
-            name="plus-circle"
-            size={20}
-            color={theme.text.SOFT_WHITE}
-          />
-        }
-      />
 
       {/* Secret Management Buttons */}
       <View style={styles.secretButtonsContainer}>
@@ -230,9 +214,6 @@ const createStyles = (theme: any) =>
     addressText: {
       flex: 1,
       fontFamily: "monospace",
-    },
-    buyButton: {
-      marginBottom: 16,
     },
     secretButtonsContainer: {
       flexDirection: "row",
