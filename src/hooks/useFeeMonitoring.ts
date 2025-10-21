@@ -7,7 +7,7 @@ import { useWalletStore } from '../store/walletStore';
  */
 export const useFeeMonitoring = (isActive: boolean) => {
   const { optimalFee, isRefreshingFees, loadOptimalFee } = useWalletStore();
-  
+
   // Countdown timer state
   const [countdown, setCountdown] = useState<number>(0);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -26,18 +26,18 @@ export const useFeeMonitoring = (isActive: boolean) => {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
-    
+
     // Set countdown to 12 seconds
     setCountdown(12);
-    
+
     // Start simple countdown interval
     const interval = setInterval(() => {
       if (!isActiveRef.current) {
         clearInterval(interval);
         return;
       }
-      
-      setCountdown((prev) => {
+
+      setCountdown(prev => {
         if (prev <= 1) {
           // Countdown finished, refresh fee and restart
           loadOptimalFee();
@@ -46,7 +46,7 @@ export const useFeeMonitoring = (isActive: boolean) => {
         return prev - 1;
       });
     }, 1000); // Update every second
-    
+
     countdownIntervalRef.current = interval;
   }, [loadOptimalFee]);
 
@@ -60,9 +60,11 @@ export const useFeeMonitoring = (isActive: boolean) => {
   // Start monitoring when active
   useEffect(() => {
     if (isActive) {
-      // Load initial fee
-      loadOptimalFee();
-      
+      // Load initial fee after a small delay to avoid render-time state updates
+      const initialLoadTimeout = setTimeout(() => {
+        loadOptimalFee();
+      }, 0);
+
       // Start fee monitoring interval (12 seconds)
       const interval = setInterval(() => {
         if (isActiveRef.current) {
@@ -70,26 +72,31 @@ export const useFeeMonitoring = (isActive: boolean) => {
         }
       }, 12000);
       feeMonitoringIntervalRef.current = interval;
-      
+
       // Start countdown timer
       startCountdown();
+
+      // Cleanup timeout
+      return () => {
+        clearTimeout(initialLoadTimeout);
+      };
     } else {
       // Clean up fee monitoring when inactive
       if (feeMonitoringIntervalRef.current) {
         clearInterval(feeMonitoringIntervalRef.current);
         feeMonitoringIntervalRef.current = null;
       }
-      
+
       // Clean up countdown timer
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
       }
-      
+
       // Reset countdown
       setCountdown(0);
     }
-    
+
     // Cleanup function
     return () => {
       if (feeMonitoringIntervalRef.current) {

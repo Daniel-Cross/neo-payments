@@ -289,11 +289,25 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
       const numAmount = parseFloat(currentAmount);
       const solAmount = inputMode === InputMode.CURRENCY ? currencyToSol(numAmount) : numAmount;
 
+      // Encrypt memo if provided (so only recipient can read it)
+      let encryptedMemo: string | undefined;
+      if (memo && memo.trim()) {
+        try {
+          encryptedMemo = await transactionService.encryptMemoForRecipient(
+            memo.trim(),
+            recipientAddress
+          );
+        } catch (error) {
+          console.error('Failed to encrypt memo:', error);
+          encryptedMemo = memo.trim(); // Fallback to plain text if encryption fails
+        }
+      }
+
       const transferParams: TransferParams = {
         from: new PublicKey(selectedWallet.publicKey),
         to: new PublicKey(recipientAddress),
         amount: solAmount,
-        memo: memo || undefined, // Memo will be automatically hashed for privacy
+        memo: encryptedMemo,
       };
 
       // Execute the transaction using our raw transaction service
@@ -313,11 +327,22 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
         // Update balance
         await updateBalance();
       } else {
+        // Close modal first so user can see the error toast
+        onClose();
         showErrorToast(result.error || AlertMessage.TRANSACTION_FAILED);
+        
+        // Clear form after closing
+        setFormState(resetFormState());
       }
     } catch (error) {
-      console.error('Send transaction error:', error);
+      console.error('Transaction error:', error);
+      
+      // Close modal first so user can see the error toast
+      onClose();
       showErrorToast(error instanceof Error ? error.message : AlertMessage.TRANSACTION_FAILED);
+      
+      // Clear form after closing
+      setFormState(resetFormState());
     } finally {
       setIsLoading(false);
     }
@@ -527,7 +552,7 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
               )}
 
               {/* Privacy Notice */}
-              <PrivacyNotice message='Memos are automatically hashed for privacy. Only the recipient can decode them.' />
+              <PrivacyNotice message='Memos are encrypted so only the recipient can read them. They are stored on-chain.' />
 
               {/* Transaction Summary */}
               {currentAmount && isValidAmount && (

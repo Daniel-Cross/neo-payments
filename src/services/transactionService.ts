@@ -8,26 +8,27 @@ import {
   SendOptions,
   VersionedTransaction,
   AddressLookupTableAccount,
-  MessageV0,
   TransactionMessage,
   Keypair,
-  Signer,
-} from "@solana/web3.js";
-import { SolanaNetwork, ConnectionCommitment, FeeOption, NetworkCongestion } from "../constants/enums";
-import * as Crypto from 'expo-crypto';
+} from '@solana/web3.js';
+import { SolanaNetwork, ConnectionCommitment, NetworkCongestion } from '../constants/enums';
+import nacl from 'tweetnacl';
+import ed2curve from 'ed2curve';
+import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
+
+// Official Solana Memo Program v1
+// https://spl.solana.com/memo
+const MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
 
 // Connection to Solana network with proper configuration
-const connection = new Connection(
-  SolanaNetwork.MAINNET,
-  {
-    commitment: ConnectionCommitment.CONFIRMED,
-    confirmTransactionInitialTimeout: 60000, // 60 seconds
-    disableRetryOnRateLimit: false,
-    httpHeaders: {
-      'User-Agent': 'Neo-Payments-Wallet/1.0',
-    },
-  }
-);
+const connection = new Connection(SolanaNetwork.MAINNET, {
+  commitment: ConnectionCommitment.CONFIRMED,
+  confirmTransactionInitialTimeout: 60000, // 60 seconds
+  disableRetryOnRateLimit: false,
+  httpHeaders: {
+    'User-Agent': 'Neo-Payments-Wallet/1.0',
+  },
+});
 
 export interface TransferParams {
   from: PublicKey;
@@ -103,12 +104,12 @@ export class TransactionService {
    */
   public async createTransferTransaction(params: TransferParams): Promise<Transaction> {
     const { from, to, amount, memo } = params;
-    
+
     // Convert SOL to lamports
     const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
-    
+
     if (lamports <= 0) {
-      throw new Error("Transfer amount must be greater than 0");
+      throw new Error('Transfer amount must be greater than 0');
     }
 
     // Create the transaction
@@ -123,15 +124,12 @@ export class TransactionService {
 
     transaction.add(transferInstruction);
 
-    // Add memo if provided (hash it for privacy)
+    // Add memo if provided
     if (memo) {
-      // Hash the memo for privacy - only recipient can decode
-      const hashedMemo = await this.hashMemo(memo, to.toString());
-      
       const memoInstruction = new TransactionInstruction({
         keys: [],
-        programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysKcWfC85B2q2"), // Memo program
-        data: Buffer.from(hashedMemo, 'utf8'),
+        programId: MEMO_PROGRAM_ID,
+        data: Buffer.from(memo, 'utf8'),
       });
       transaction.add(memoInstruction);
     }
@@ -148,11 +146,11 @@ export class TransactionService {
     lookupTableAccounts?: AddressLookupTableAccount[]
   ): Promise<VersionedTransaction> {
     const { from, to, amount, memo } = params;
-    
+
     const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
-    
+
     if (lamports <= 0) {
-      throw new Error("Transfer amount must be greater than 0");
+      throw new Error('Transfer amount must be greater than 0');
     }
 
     // Create instructions
@@ -164,16 +162,13 @@ export class TransactionService {
       }),
     ];
 
-    // Add memo if provided (hash it for privacy)
+    // Add memo if provided
     if (memo) {
-      // Hash the memo for privacy - only recipient can decode
-      const hashedMemo = await this.hashMemo(memo, to.toString());
-      
       instructions.push(
         new TransactionInstruction({
           keys: [],
-          programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysKcWfC85B2q2"),
-          data: Buffer.from(hashedMemo, 'utf8'),
+          programId: MEMO_PROGRAM_ID,
+          data: Buffer.from(memo, 'utf8'),
         })
       );
     }
@@ -215,23 +210,33 @@ export class TransactionService {
     maxRetries: number = 3
   ): Promise<TransactionResult> {
     const startTime = Date.now();
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         let signature: string;
-        
+
         // Handle different transaction types
         if (transaction instanceof VersionedTransaction) {
           signature = await this.connection.sendTransaction(transaction, options);
         } else {
-          signature = await this.connection.sendTransaction(transaction, [], options);
+          // For legacy Transaction, use sendRawTransaction with serialized transaction
+          signature = await this.connection.sendRawTransaction(transaction.serialize(), options);
         }
-        
+
         // Wait for confirmation with timeout
-        const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
-        
+        // Get the latest blockhash for confirmation
+        const latestBlockhash = await this.connection.getLatestBlockhash('confirmed');
+        const confirmation = await this.connection.confirmTransaction(
+          {
+            signature,
+            blockhash: latestBlockhash.blockhash,
+            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+          },
+          'confirmed'
+        );
+
         const confirmationTime = Date.now() - startTime;
-        
+
         if (confirmation.value.err) {
           return {
             success: false,
@@ -251,21 +256,24 @@ export class TransactionService {
       } catch (error) {
         const isLastAttempt = attempt === maxRetries;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
+
         if (isLastAttempt) {
           return {
             success: false,
             error: `Transaction failed after ${maxRetries} attempts: ${errorMessage}`,
           };
         }
-        
+
         // Wait before retry (exponential backoff)
         const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s...
-        console.warn(`Transaction attempt ${attempt} failed, retrying in ${delay}ms:`, errorMessage);
+        console.warn(
+          `Transaction attempt ${attempt} failed, retrying in ${delay}ms:`,
+          errorMessage
+        );
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
+
     return {
       success: false,
       error: 'Transaction failed after all retry attempts',
@@ -282,14 +290,14 @@ export class TransactionService {
   ): Promise<TransactionResult> {
     try {
       let transaction: Transaction | VersionedTransaction;
-      
+
       if (useVersioned) {
         // Create versioned transaction with proper blockhash
         transaction = await this.createVersionedTransferTransaction(params);
       } else {
         // Create legacy transaction
         transaction = await this.createTransferTransaction(params);
-        
+
         // Set recent blockhash for legacy transaction
         const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
         transaction.recentBlockhash = blockhash;
@@ -301,7 +309,7 @@ export class TransactionService {
 
       // Send the transaction
       const result = await this.sendTransaction(signedTransaction);
-      
+
       return result;
     } catch (error) {
       return {
@@ -320,7 +328,7 @@ export class TransactionService {
     try {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
-      
+
       if (transaction instanceof Transaction) {
         transaction.recentBlockhash = blockhash;
       }
@@ -332,17 +340,17 @@ export class TransactionService {
       } else {
         simulation = await this.connection.simulateTransaction(transaction);
       }
-      
+
       if (simulation.value.err) {
         throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
       }
 
       // Get the actual fee from simulation (use default if not available)
       const fee = 5000; // Default fee in lamports
-      
+
       // Get current priority fee rate
       const priorityFeeRate = await this.getCurrentFeeRate();
-      
+
       return {
         fee,
         feeInSOL: fee / LAMPORTS_PER_SOL,
@@ -369,15 +377,15 @@ export class TransactionService {
   ): Promise<TransactionDetails[]> {
     try {
       const signatures = await this.connection.getSignaturesForAddress(address, { limit });
-      
+
       const transactions: TransactionDetails[] = [];
-      
+
       for (const sigInfo of signatures) {
         try {
           const tx = await this.connection.getTransaction(sigInfo.signature, {
             maxSupportedTransactionVersion: 0,
           });
-          
+
           if (tx && tx.meta) {
             // Parse transaction details
             const transactionDetails: TransactionDetails = {
@@ -395,7 +403,7 @@ export class TransactionService {
             try {
               const message = tx.transaction.message;
               let accountKeys: PublicKey[];
-              
+
               // Get account keys based on transaction type
               if ('accountKeys' in message) {
                 // Legacy transaction
@@ -411,7 +419,7 @@ export class TransactionService {
                   }
                 }
               }
-              
+
               // Calculate amount from balance changes
               if (tx.meta.preBalances && tx.meta.postBalances && accountKeys.length >= 2) {
                 const balanceChange = tx.meta.preBalances[0] - tx.meta.postBalances[0];
@@ -421,13 +429,15 @@ export class TransactionService {
                   transactionDetails.to = accountKeys[1].toString();
                 }
               }
-              
+
               // Parse memo if present
               if (tx.meta.logMessages) {
                 for (const log of tx.meta.logMessages) {
                   if (log.includes('Program log: ')) {
                     const memoMatch = log.match(/Program log: (.+)/);
                     if (memoMatch && memoMatch[1]) {
+                      // Store the raw memo (might be encrypted)
+                      // Decryption will be done when displaying if user has the keypair
                       transactionDetails.memo = memoMatch[1];
                       break;
                     }
@@ -444,7 +454,7 @@ export class TransactionService {
           console.warn(`Failed to fetch transaction ${sigInfo.signature}:`, error);
         }
       }
-      
+
       return transactions;
     } catch (error) {
       console.error('Failed to get transaction history:', error);
@@ -486,16 +496,16 @@ export class TransactionService {
     try {
       const recentFees = await this.connection.getRecentPrioritizationFees();
       const baseFee = 5000; // Base transaction fee in lamports
-      
+
       let priorityFee = 1000; // Default minimum
       let networkCongestion: NetworkCongestion = NetworkCongestion.LOW;
       let estimatedTime = '5-15 seconds';
-      
+
       if (recentFees.length > 0) {
         const sortedFees = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
         const p50 = sortedFees[Math.floor(sortedFees.length * 0.5)];
         const p75 = sortedFees[Math.floor(sortedFees.length * 0.75)];
-        
+
         // Determine network congestion
         if (p75 > 50000) {
           networkCongestion = NetworkCongestion.HIGH;
@@ -506,14 +516,14 @@ export class TransactionService {
         } else {
           estimatedTime = '3-8 seconds';
         }
-        
+
         // Use P50 for optimal price-to-performance ratio
         // This gives good confirmation speed without overpaying
         priorityFee = Math.max(1000, p50);
       }
-      
+
       const totalFee = baseFee + priorityFee;
-      
+
       return {
         baseFee,
         priorityFee,
@@ -525,12 +535,12 @@ export class TransactionService {
       };
     } catch (error) {
       console.warn('Optimal fee calculation failed, using defaults:', error);
-      
+
       // Fallback to conservative default
       const baseFee = 5000;
       const priorityFee = 1000;
       const totalFee = baseFee + priorityFee;
-      
+
       return {
         baseFee,
         priorityFee,
@@ -544,28 +554,108 @@ export class TransactionService {
   }
 
   /**
-   * Hash a memo for privacy (only recipient can decode)
+   * Encrypt a memo for the recipient so only they can read it.
+   * Uses NaCl box (asymmetric encryption) with the recipient's Solana public key.
    */
-  public async hashMemo(memo: string, recipientPublicKey: string): Promise<string> {
-    // Create a deterministic hash using the memo and recipient's public key
-    // This ensures only the recipient can decode it
-    const data = `${memo}:${recipientPublicKey}`;
-    const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, data, { encoding: Crypto.CryptoEncoding.HEX });
-    return `HASH:${hash}`;
+  public async encryptMemoForRecipient(memo: string, recipientPublicKey: string): Promise<string> {
+    try {
+      // Convert Solana PublicKey string to raw bytes (32 bytes)
+      const publicKey = new PublicKey(recipientPublicKey);
+      const recipientPub = publicKey.toBytes();
+
+      // Convert Ed25519 public key to Curve25519 for encryption
+      const recipientCurvePub = ed2curve.convertPublicKey(recipientPub);
+      if (!recipientCurvePub) throw new Error('Invalid recipient public key');
+
+      // Generate ephemeral Curve25519 keypair
+      const ephemeral = nacl.box.keyPair();
+      const nonce = nacl.randomBytes(nacl.box.nonceLength);
+      const message = decodeUTF8(memo);
+
+      // Encrypt the memo (sender ephemeral secret + recipient public)
+      const cipher = nacl.box(message, nonce, recipientCurvePub, ephemeral.secretKey);
+
+      // Encode to base64 for storing in memo field
+      return `${encodeBase64(ephemeral.publicKey)}:${encodeBase64(nonce)}:${encodeBase64(cipher)}`;
+    } catch (err) {
+      throw new Error(`Failed to encrypt memo: ${(err as Error).message}`);
+    }
   }
 
   /**
-   * Decode a hashed memo (only works for the intended recipient)
+   * Check if a memo is encrypted (has the format: base64:base64:base64)
    */
-  public async decodeMemo(hashedMemo: string, recipientPublicKey: string, originalMemo: string): Promise<boolean> {
-    if (!hashedMemo.startsWith('HASH:')) {
-      return false;
+  public isEncryptedMemo(memo: string): boolean {
+    if (!memo) return false;
+    const parts = memo.split(':');
+    return parts.length === 3 && parts.every(part => part.length > 0);
+  }
+
+  /**
+   * Decrypt a memo sent to this wallet.
+   * Requires the recipient's Solana keypair (ed25519).
+   */
+  public async decryptMemoPayload(
+    encryptedPayload: string,
+    recipientKeypair: Keypair
+  ): Promise<string> {
+    try {
+      const [ephemeralPubB64, nonceB64, cipherB64] = encryptedPayload.split(':');
+      if (!ephemeralPubB64 || !nonceB64 || !cipherB64) {
+        throw new Error('Invalid encrypted memo format');
+      }
+
+      const ephPub = decodeBase64(ephemeralPubB64);
+      const nonce = decodeBase64(nonceB64);
+      const cipher = decodeBase64(cipherB64);
+
+      // Convert recipient's ed25519 private key → curve25519 secret
+      const secret = ed2curve.convertSecretKey(recipientKeypair.secretKey.slice(0, 32));
+      if (!secret) throw new Error('Failed to convert recipient secret key');
+
+      // Decrypt the message
+      const decrypted = nacl.box.open(cipher, nonce, ephPub, secret);
+      if (!decrypted) throw new Error('Decryption failed');
+
+      return encodeUTF8(decrypted);
+    } catch (err) {
+      throw new Error(`Failed to decrypt memo: ${(err as Error).message}`);
     }
-    
-    const hash = hashedMemo.substring(5); // Remove 'HASH:' prefix
-    const expectedHash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${originalMemo}:${recipientPublicKey}`, { encoding: Crypto.CryptoEncoding.HEX });
-    
-    return hash === expectedHash;
+  }
+
+  /**
+   * Try to decrypt a memo if it's encrypted, otherwise return as-is
+   * Returns both the decrypted text and whether it was encrypted
+   */
+  public async tryDecryptMemo(
+    memo: string,
+    recipientKeypair?: Keypair
+  ): Promise<{ text: string; wasEncrypted: boolean; decrypted: boolean }> {
+    if (!memo) {
+      return { text: '', wasEncrypted: false, decrypted: false };
+    }
+
+    const isEncrypted = this.isEncryptedMemo(memo);
+
+    if (!isEncrypted) {
+      // Plain text memo
+      return { text: memo, wasEncrypted: false, decrypted: false };
+    }
+
+    if (!recipientKeypair) {
+      // Encrypted but no keypair to decrypt
+      return { text: '🔒 Encrypted message', wasEncrypted: true, decrypted: false };
+    }
+
+    try {
+      // Try to decrypt
+      const decrypted = await this.decryptMemoPayload(memo, recipientKeypair);
+      return { text: decrypted, wasEncrypted: true, decrypted: true };
+    } catch (error) {
+      console.warn('Failed to decrypt memo:', error);
+      // Encrypted but decryption failed (not intended for this keypair)
+      return { text: '🔒 Encrypted (not for you)', wasEncrypted: true, decrypted: false };
+    }
   }
 
   /**
