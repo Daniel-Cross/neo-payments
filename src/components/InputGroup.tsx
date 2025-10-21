@@ -1,4 +1,4 @@
-import { View, TextInput, StyleSheet, TextInputProps, TouchableOpacity } from 'react-native';
+import { View, TextInput, StyleSheet, TextInputProps, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
 import { TypographyVariant } from '../constants/enums';
@@ -12,6 +12,7 @@ interface InputGroupProps {
   placeholder?: string;
   error?: string;
   success?: string;
+  isValidating?: boolean;
   multiline?: boolean;
   maxLength?: number;
   keyboardType?: TextInputProps['keyboardType'];
@@ -30,6 +31,7 @@ const InputGroup = ({
   placeholder,
   error,
   success,
+  isValidating = false,
   multiline = false,
   maxLength,
   keyboardType = 'default',
@@ -93,7 +95,20 @@ const InputGroup = ({
         )}
       </View>
       
-      {hasValue && hasError && (
+      {hasValue && isValidating && (
+        <View style={styles.validatingContainer}>
+          <ActivityIndicator size="small" color={theme.text.LIGHT_GREY} />
+          <Typography 
+            variant={TypographyVariant.CAPTION} 
+            color={theme.text.LIGHT_GREY}
+            style={styles.validatingText}
+          >
+            Validating...
+          </Typography>
+        </View>
+      )}
+      
+      {hasValue && hasError && !isValidating && (
         <Typography 
           variant={TypographyVariant.CAPTION} 
           color={theme.text.ERROR_RED}
@@ -103,7 +118,7 @@ const InputGroup = ({
         </Typography>
       )}
       
-      {hasValue && hasSuccess && (
+      {hasValue && hasSuccess && !isValidating && (
         <Typography 
           variant={TypographyVariant.CAPTION} 
           color={theme.text.SUCCESS_GREEN}
@@ -157,6 +172,14 @@ const createStyles = (theme: any) => StyleSheet.create({
   inputSuccess: {
     borderColor: theme.text.SUCCESS_GREEN,
     backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
+  },
+  validatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: BASE_MARGIN / 2,
+  },
+  validatingText: {
+    marginLeft: BASE_MARGIN / 2,
   },
   errorText: {
     marginTop: BASE_MARGIN,

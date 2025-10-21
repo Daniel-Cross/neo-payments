@@ -68,6 +68,7 @@ const resetFormState = () => ({
   inputMode: InputMode.CURRENCY,
   memo: '',
   isValidAddress: false,
+  isValidatingAddress: false,
   isValidAmount: false,
   estimatedFee: 0,
   totalCost: 0,
@@ -96,6 +97,7 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
     inputMode,
     memo,
     isValidAddress,
+    isValidatingAddress,
     isValidAmount,
     estimatedFee,
     totalCost,
@@ -122,24 +124,44 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
   // Validate recipient address
   const validateAddress = useCallback(async (address: string) => {
     if (!address.trim()) {
-      setFormState(prev => ({ ...prev, isValidAddress: false, recipientBalance: null }));
+      setFormState(prev => ({ ...prev, isValidAddress: false, isValidatingAddress: false, recipientBalance: null }));
       return;
     }
 
+    // Set validating state
+    setFormState(prev => ({ ...prev, isValidatingAddress: true }));
+
+    // Small delay to ensure validating state is visible
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     const isValid = transactionService.validateAddress(address);
-    setFormState(prev => ({ ...prev, isValidAddress: isValid }));
 
     if (isValid) {
       try {
         const recipientPubkey = new PublicKey(address);
         const balance = await transactionService.getBalance(recipientPubkey);
-        setFormState(prev => ({ ...prev, recipientBalance: balance }));
+        setFormState(prev => ({ 
+          ...prev, 
+          isValidAddress: true, 
+          isValidatingAddress: false, 
+          recipientBalance: balance 
+        }));
       } catch (error) {
         console.warn('Failed to fetch recipient balance:', error);
-        setFormState(prev => ({ ...prev, recipientBalance: null }));
+        setFormState(prev => ({ 
+          ...prev, 
+          isValidAddress: true, 
+          isValidatingAddress: false, 
+          recipientBalance: null 
+        }));
       }
     } else {
-      setFormState(prev => ({ ...prev, recipientBalance: null }));
+      setFormState(prev => ({ 
+        ...prev, 
+        isValidAddress: false, 
+        isValidatingAddress: false, 
+        recipientBalance: null 
+      }));
     }
   }, []);
 
@@ -415,12 +437,18 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
               selectedType={selectedRecipientType}
               onTypeChange={(type) => setFormState(prev => ({ ...prev, selectedRecipientType: type }))}
               recipientAddress={recipientAddress}
-              onAddressChange={(address) => setFormState(prev => ({ ...prev, recipientAddress: address }))}
+              onAddressChange={(address) => setFormState(prev => ({ 
+                ...prev, 
+                recipientAddress: address,
+                isValidatingAddress: address.trim() ? true : false,
+                isValidAddress: false
+              }))}
               contacts={contacts}
               favorites={favorites}
               onContactSelect={handleContactSelect}
               onToggleFavorite={handleToggleFavorite}
               isValidAddress={isValidAddress}
+              isValidatingAddress={isValidatingAddress}
               recipientBalance={recipientBalance}
             />
 

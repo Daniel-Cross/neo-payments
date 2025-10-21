@@ -32,6 +32,7 @@ interface RecipientSelectionProps {
   onContactSelect: (contact: Contact) => void;
   onToggleFavorite: (contact: Contact) => void;
   isValidAddress: boolean;
+  isValidatingAddress?: boolean;
   recipientBalance: number | null;
 }
 
@@ -45,6 +46,7 @@ const RecipientSelection = ({
   onContactSelect,
   onToggleFavorite,
   isValidAddress,
+  isValidatingAddress = false,
   recipientBalance,
 }: RecipientSelectionProps) => {
   const { theme } = useTheme();
@@ -86,8 +88,9 @@ const RecipientSelection = ({
         value={recipientAddress}
         onChangeText={onAddressChange}
         placeholder="Enter Solana address..."
-        error={recipientAddress && !isValidAddress ? "Invalid Solana address" : undefined}
-        success={recipientAddress && isValidAddress ? `Valid address ${recipientBalance !== null ? `(${recipientBalance.toFixed(4)} SOL)` : ''}` : undefined}
+        error={recipientAddress && !isValidAddress && !isValidatingAddress ? "Invalid Solana address" : undefined}
+        success={recipientAddress && isValidAddress ? "Valid Solana address" : undefined}
+        isValidating={isValidatingAddress}
         autoCapitalize="none"
         autoCorrect={false}
         multiline
