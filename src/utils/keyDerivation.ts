@@ -1,6 +1,9 @@
-import { Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
-import * as bip39 from "bip39";
+import { Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
+import * as bip39 from 'bip39';
+import { hmac } from '@noble/hashes/hmac';
+import { sha512 } from '@noble/hashes/sha2';
+import { Buffer } from 'buffer';
 
 /**
  * Derives a public key from a private key input
@@ -12,7 +15,7 @@ export const derivePublicKeyFromPrivateKey = (privateKeyInput: string): string =
     const cleanPrivateKey = privateKeyInput.trim();
 
     if (!cleanPrivateKey || cleanPrivateKey.length === 0) {
-      throw new Error("Private key cannot be empty");
+      throw new Error('Private key cannot be empty');
     }
 
     let privateKeyBytes: Uint8Array;
@@ -23,11 +26,11 @@ export const derivePublicKeyFromPrivateKey = (privateKeyInput: string): string =
     } catch (base58Error) {
       try {
         // Try hex format (remove '0x' prefix if present)
-        const hexKey = cleanPrivateKey.replace("0x", "");
+        const hexKey = cleanPrivateKey.replace('0x', '');
 
         // Check if it's a valid hex string
         if (!/^[0-9a-fA-F]+$/.test(hexKey)) {
-          throw new Error("Private key must be in base58 or hexadecimal format");
+          throw new Error('Private key must be in base58 or hexadecimal format');
         }
 
         // Check if it's the correct length (64 bytes = 128 hex characters)
@@ -38,11 +41,9 @@ export const derivePublicKeyFromPrivateKey = (privateKeyInput: string): string =
         }
 
         // Convert hex string to Uint8Array
-        privateKeyBytes = new Uint8Array(
-          hexKey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-        );
+        privateKeyBytes = new Uint8Array(hexKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
       } catch (hexError) {
-        throw new Error("Private key must be in base58 (Phantom) or hexadecimal format");
+        throw new Error('Private key must be in base58 (Phantom) or hexadecimal format');
       }
     }
 
@@ -57,33 +58,104 @@ export const derivePublicKeyFromPrivateKey = (privateKeyInput: string): string =
     const keypair = Keypair.fromSecretKey(privateKeyBytes);
     return keypair.publicKey.toString();
   } catch (error) {
-    throw new Error(`Failed to derive public key from private key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to derive public key from private key: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
+  }
+};
+
+const deriveEd25519Key = (seed: Buffer | Uint8Array, path: string): Uint8Array => {
+  const seedBytes = seed instanceof Uint8Array ? seed : new Uint8Array(seed);
+
+  const MASTER_KEY = new TextEncoder().encode('ed25519 seed');
+  let I = hmac(sha512, MASTER_KEY, seedBytes); // key, data order
+  let privKey = I.slice(0, 32);
+  let chainCode = I.slice(32);
+
+  const parts = path.split('/').slice(1); // skip 'm'
+  for (const part of parts) {
+    const index = (parseInt(part.replace("'", ''), 10) + 0x80000000) >>> 0;
+    const data = Buffer.concat([Buffer.from([0x00]), Buffer.from(privKey), Buffer.alloc(4)]);
+    data.writeUInt32BE(index, data.length - 4);
+    I = hmac(sha512, chainCode, data);
+    privKey = I.slice(0, 32);
+    chainCode = I.slice(32);
+  }
+  return privKey;
+};
+
+/**
+ * Derives a keypair from a seed phrase using proper Ed25519 derivation
+ * This matches Phantom's derivation exactly: m/44'/501'/0'/0' for first address
+ * Uses SLIP-0010 Ed25519 key derivation (correct for Solana)
+ */
+export const deriveKeypairFromSeedPhrase = async (
+  seedPhrase: string,
+  accountIndex: number = 0
+): Promise<Keypair> => {
+  try {
+    // Clean and validate seed phrase
+    const cleanSeedPhrase = seedPhrase.trim().toLowerCase();
+
+    if (!bip39.validateMnemonic(cleanSeedPhrase)) {
+      throw new Error('Invalid seed phrase');
+    }
+
+    // 1. BIP39 mnemonic → seed
+    const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
+
+    // 2. Correct Solana derivation path (Phantom format)
+    const derivationPath = `m/44'/501'/${accountIndex}'/0'`;
+    // 3. ✅ SLIP-0010 ed25519 derivation (correct for Solana)
+    const derivedPrivKey = deriveEd25519Key(seed, derivationPath);
+    // 4. Solana keypair from derived seed
+    return Keypair.fromSeed(Buffer.from(derivedPrivKey));
+  } catch (error) {
+    throw new Error(
+      `Failed to derive keypair from seed phrase: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
   }
 };
 
 /**
- * Derives a public key from a seed phrase (mnemonic)
+ * Derives a public key from a seed phrase using proper BIP44 derivation
+ * This matches Phantom's derivation: m/44'/501'/0'/0' for first address
  */
-export const derivePublicKeyFromSeedPhrase = async (seedPhrase: string): Promise<string> => {
+export const derivePublicKeyFromSeedPhrase = async (
+  seedPhrase: string,
+  accountIndex: number = 0
+): Promise<string> => {
+  const keypair = await deriveKeypairFromSeedPhrase(seedPhrase, accountIndex);
+  return keypair.publicKey.toString();
+};
+
+/**
+ * Derives multiple public keys from a seed phrase using BIP44 derivation paths
+ * This matches Phantom's behavior for multiple addresses
+ */
+export const deriveMultiplePublicKeysFromSeedPhrase = async (
+  seedPhrase: string,
+  count: number = 5
+): Promise<string[]> => {
   try {
-    // Clean and validate seed phrase
-    const cleanSeedPhrase = seedPhrase.trim().toLowerCase();
-    
-    if (!bip39.validateMnemonic(cleanSeedPhrase)) {
-      throw new Error("Invalid seed phrase");
+    const publicKeys: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const publicKey = await derivePublicKeyFromSeedPhrase(seedPhrase, i);
+      publicKeys.push(publicKey);
     }
 
-    // Generate seed from mnemonic
-    const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
-
-    // For Solana, we need to use the first 32 bytes of the seed
-    // and create a keypair from it
-    const seedBytes = seed.slice(0, 32);
-    const keypair = Keypair.fromSeed(seedBytes);
-    
-    return keypair.publicKey.toString();
+    return publicKeys;
   } catch (error) {
-    throw new Error(`Failed to derive public key from seed phrase: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to derive multiple public keys from seed phrase: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`
+    );
   }
 };
 

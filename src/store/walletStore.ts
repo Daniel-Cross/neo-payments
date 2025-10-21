@@ -3,9 +3,10 @@ import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.j
 import bs58 from "bs58";
 import * as bip39 from "bip39";
 import { SecureWalletStorage } from "../utils/secureStorage";
-import { SolanaNetwork, ConnectionCommitment, FeeOption, NetworkCongestion, Currency } from "../constants/enums";
+import { SolanaNetwork, ConnectionCommitment, NetworkCongestion, Currency } from "../constants/enums";
 import { priceService } from "../utils/priceService";
 import { transactionService, TransferParams, TransactionResult } from "../services/transactionService";
+import { deriveKeypairFromSeedPhrase } from "../utils/keyDerivation";
 
 // Solana mainnet connection
 const connection = new Connection(
@@ -20,6 +21,9 @@ export interface Wallet {
   keypair: Keypair;
   balance: number;
   createdAt: Date;
+  seedPhrase?: string; // Store the seed phrase for multi-address wallets
+  derivationPath?: number; // Track which derivation path this wallet uses
+  isMultiAddress?: boolean; // Flag to indicate if this is part of a multi-address wallet
 }
 
 export interface WalletState {
@@ -68,6 +72,7 @@ export interface WalletState {
   loadWallets: () => Promise<boolean>;
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
+  updateAllBalances: () => Promise<void>;
   updateSolPrice: () => Promise<void>;
   setCurrency: (currency: Currency) => void;
   exportPrivateKey: () => Promise<string | null>;
@@ -81,6 +86,13 @@ export interface WalletState {
   
   // Fee monitoring methods
   loadOptimalFee: () => Promise<void>;
+  
+  // Multi-address wallet methods
+  generateAdditionalAddresses: (seedPhrase: string, count: number) => Promise<boolean>;
+  
+  // Debug methods
+  refreshAllBalances: () => Promise<void>;
+  testDerivation: (seedPhrase: string) => Promise<string[]>;
 }
 
 // Helper function to generate wallet name
@@ -305,48 +317,73 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
       // Generate seed from mnemonic
       const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
-
-      // For Solana, we need to use the first 32 bytes of the seed
-      // and create a keypair from it
       const seedBytes = seed.slice(0, 32);
-      const keypair = Keypair.fromSeed(seedBytes);
-      const publicKey = keypair.publicKey.toString();
-      const walletName = name || generateWalletName(wallets, "imported");
 
-      // Check if wallet already exists
-      const existingWallet = wallets.find((w) => w.publicKey === publicKey);
-      if (existingWallet) {
-        throw new Error("Wallet with this public key already exists");
+      const newWallets: Wallet[] = [];
+      const walletCount = 5; // Always generate 5 addresses automatically
+      const baseWalletName = name || generateWalletName(wallets, "imported");
+
+      for (let i = 0; i < walletCount; i++) {
+        // Use proper BIP44 derivation for each address
+        const keypair = await deriveKeypairFromSeedPhrase(cleanSeedPhrase, i);
+        const publicKey = keypair.publicKey.toString();
+
+        // Check if wallet already exists
+        const existingWallet = wallets.find((w) => w.publicKey === publicKey);
+        if (existingWallet) {
+          continue; // Skip if wallet already exists
+        }
+
+        const walletName = walletCount > 1 
+          ? `${baseWalletName} (${i + 1})` 
+          : baseWalletName;
+
+        const newWallet: Wallet = {
+          id: `wallet_${Date.now()}_${i}_${Math.random()
+            .toString(36)
+            .substring(2, 11)}`,
+          name: walletName,
+          publicKey,
+          keypair,
+          balance: 0,
+          createdAt: new Date(),
+          seedPhrase: cleanSeedPhrase,
+          derivationPath: i,
+          isMultiAddress: walletCount > 1,
+        };
+
+        newWallets.push(newWallet);
       }
 
-      const newWallet: Wallet = {
-        id: `wallet_${Date.now()}_${Math.random()
-          .toString(36)
-          .substring(2, 11)}`,
-        name: walletName,
-        publicKey,
-        keypair,
-        balance: 0,
-        createdAt: new Date(),
-      };
+      if (newWallets.length === 0) {
+        throw new Error("All wallets from this seed phrase already exist");
+      }
 
       // Store all wallets securely
-      const updatedWallets = [...wallets, newWallet];
+      const updatedWallets = [...wallets, ...newWallets];
       const stored = await SecureWalletStorage.storeWallets(updatedWallets);
       if (!stored) {
         throw new Error("Failed to store wallet securely");
       }
 
+      // Select the first new wallet
+      const firstNewWallet = newWallets[0];
       set({
         wallets: updatedWallets,
-        selectedWalletId: newWallet.id,
-        selectedWallet: newWallet,
-        publicKey: newWallet.publicKey,
-        balance: newWallet.balance,
-        keypair: newWallet.keypair,
+        selectedWalletId: firstNewWallet.id,
+        selectedWallet: firstNewWallet,
+        publicKey: firstNewWallet.publicKey,
+        balance: firstNewWallet.balance,
+        keypair: firstNewWallet.keypair,
         isConnected: true,
         isLoading: false,
       });
+
+      // Update balances for all wallets after import
+      console.log(`[importWalletFromSeedPhrase] Imported ${newWallets.length} wallets, updating balances...`);
+      setTimeout(() => {
+        get().updateAllBalances();
+      }, 100);
 
       return true;
     } catch (error) {
@@ -505,7 +542,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       // Fetch the actual balance from blockchain after setting up the wallet
       // Use setTimeout to avoid blocking the UI
       setTimeout(() => {
-        get().updateBalance();
+        get().updateAllBalances();
       }, 100);
 
       return true;
@@ -575,6 +612,83 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     } catch (error) {
       console.error("Failed to fetch balance:", error);
       // Don't throw the error, just log it to avoid breaking the app
+    }
+  },
+
+  // Update balances for all wallets
+  updateAllBalances: async () => {
+    const { wallets } = get();
+    console.log(`[updateAllBalances] Starting balance update for ${wallets.length} wallets`);
+    
+    if (wallets.length === 0) {
+      console.log("[updateAllBalances] No wallets to update");
+      return;
+    }
+
+    try {
+      // Create promises for all balance updates
+      const balancePromises = wallets.map(async (wallet) => {
+        try {
+          console.log(`[updateAllBalances] Fetching balance for wallet ${wallet.name} (${wallet.publicKey.slice(0, 8)}...)`);
+          const balance = await connection.getBalance(wallet.keypair.publicKey);
+          const solBalance = balance / LAMPORTS_PER_SOL;
+          console.log(`[updateAllBalances] Wallet ${wallet.name} balance: ${solBalance} SOL`);
+          return { ...wallet, balance: solBalance };
+        } catch (error) {
+          console.error(`Failed to update balance for wallet ${wallet.id}:`, error);
+          return wallet; // Return original wallet if balance update fails
+        }
+      });
+
+      // Wait for all balance updates to complete
+      const updatedWallets = await Promise.all(balancePromises);
+      console.log(`[updateAllBalances] Updated ${updatedWallets.length} wallets`);
+
+      // Get current SOL price to calculate USD value
+      const { solPrice, selectedWallet } = get();
+      const selectedWalletUpdated = updatedWallets.find(w => w.id === selectedWallet?.id);
+
+      set({
+        wallets: updatedWallets,
+        balance: selectedWalletUpdated?.balance || 0,
+        fiatValue: (selectedWalletUpdated?.balance || 0) * solPrice,
+        lastBalanceUpdate: Date.now(),
+      });
+      
+      console.log(`[updateAllBalances] Balance update complete. Selected wallet balance: ${selectedWalletUpdated?.balance || 0} SOL`);
+    } catch (error) {
+      console.error("Failed to update all balances:", error);
+    }
+  },
+
+  // Debug method to manually refresh all balances
+  refreshAllBalances: async () => {
+    console.log("[refreshAllBalances] Manual balance refresh triggered");
+    await get().updateAllBalances();
+  },
+
+  // Debug method to test derivation paths
+  testDerivation: async (seedPhrase: string) => {
+    try {
+      const cleanSeedPhrase = seedPhrase.trim().toLowerCase();
+      if (!bip39.validateMnemonic(cleanSeedPhrase)) {
+        throw new Error("Invalid seed phrase");
+      }
+
+      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
+      const addresses: string[] = [];
+
+      for (let i = 0; i < 5; i++) {
+        // Use proper BIP44 derivation for each address
+        const keypair = await deriveKeypairFromSeedPhrase(cleanSeedPhrase, i);
+        addresses.push(keypair.publicKey.toString());
+      }
+
+      console.log("[testDerivation] Generated addresses:", addresses);
+      return addresses;
+    } catch (error) {
+      console.error("[testDerivation] Error:", error);
+      return [];
     }
   },
 
@@ -743,6 +857,82 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     } catch (error) {
       console.warn("Failed to load optimal fee:", error);
       set({ isRefreshingFees: false });
+    }
+  },
+
+  generateAdditionalAddresses: async (seedPhrase: string, count: number) => {
+    try {
+      const { wallets } = get();
+
+      // Clean and validate seed phrase
+      const cleanSeedPhrase = seedPhrase.trim().toLowerCase();
+      if (!bip39.validateMnemonic(cleanSeedPhrase)) {
+        throw new Error("Invalid seed phrase");
+      }
+
+      // Generate seed from mnemonic
+      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
+      const seedBytes = seed.slice(0, 32);
+
+      // Find existing wallets from this seed phrase to determine next derivation path
+      const existingWallets = wallets.filter(w => w.seedPhrase === cleanSeedPhrase);
+      const maxDerivationPath = Math.max(...existingWallets.map(w => w.derivationPath || 0), -1);
+      const startIndex = maxDerivationPath + 1;
+
+      const newWallets: Wallet[] = [];
+      const baseWalletName = existingWallets[0]?.name?.replace(/ \(\d+\)$/, '') || 'Imported Wallet';
+
+      for (let i = 0; i < count; i++) {
+        const accountIndex = startIndex + i;
+        
+        // Use proper BIP44 derivation for each address
+        const keypair = await deriveKeypairFromSeedPhrase(cleanSeedPhrase, accountIndex);
+        const publicKey = keypair.publicKey.toString();
+
+        // Check if wallet already exists
+        const existingWallet = wallets.find((w) => w.publicKey === publicKey);
+        if (existingWallet) {
+          continue; // Skip if wallet already exists
+        }
+
+        const walletName = `${baseWalletName} (${accountIndex + 1})`;
+
+        const newWallet: Wallet = {
+          id: `wallet_${Date.now()}_${accountIndex}_${Math.random()
+            .toString(36)
+            .substring(2, 11)}`,
+          name: walletName,
+          publicKey,
+          keypair,
+          balance: 0,
+          createdAt: new Date(),
+          seedPhrase: cleanSeedPhrase,
+          derivationPath: accountIndex,
+          isMultiAddress: true,
+        };
+
+        newWallets.push(newWallet);
+      }
+
+      if (newWallets.length === 0) {
+        throw new Error("No new addresses could be generated");
+      }
+
+      // Store all wallets securely
+      const updatedWallets = [...wallets, ...newWallets];
+      const stored = await SecureWalletStorage.storeWallets(updatedWallets);
+      if (!stored) {
+        throw new Error("Failed to store wallet securely");
+      }
+
+      set({
+        wallets: updatedWallets,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to generate additional addresses:", error);
+      return false;
     }
   },
 

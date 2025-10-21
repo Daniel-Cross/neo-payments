@@ -9,6 +9,10 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://chacyivwarxriajnhdkm.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoYWN5aXZ3YXJ4cmlham5oZGttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1OTg3NzcsImV4cCI6MjA3NjE3NDc3N30.osbZ11U7xq3lu0KVG4lSAFnO7ks911oULe8Afp6AO_Y"
       }
     },
     "preview": {
