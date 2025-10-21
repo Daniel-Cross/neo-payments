@@ -11,7 +11,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { PublicKey } from '@solana/web3.js';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 // Contexts and Hooks
 import { useTheme } from '../contexts/ThemeContext';
@@ -29,6 +28,7 @@ import TransactionSummary from './TransactionSummary';
 import PrivacyNotice from './PrivacyNotice';
 import RecipientSelection, { Contact } from './RecipientSelection';
 import CloseButton from './CloseButton';
+import QRScanner from './QRScanner';
 
 // Services
 import { transactionService, TransferParams } from '../services/transactionService';
@@ -48,6 +48,7 @@ import {
   RecipientType,
 } from '../constants/enums';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
+import { evaluateMathExpression } from '../utils/walletUtils';
 import { EDGE_MARGIN } from '../constants/styles';
 
 // Constants
@@ -58,9 +59,11 @@ const AMOUNT_VALIDATION_DELAY = 300;
 interface SendSolModalProps {
   visible: boolean;
   onClose: () => void;
+  initialRecipientAddress?: string;
 }
 
 // Helper functions
+
 const resetFormState = () => ({
   recipientAddress: '',
   amount: '',
@@ -76,18 +79,19 @@ const resetFormState = () => ({
   selectedRecipientType: RecipientType.WALLET_ADDRESS,
 });
 
-export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
+export default function SendSolModal({ visible, onClose, initialRecipientAddress }: SendSolModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
   const { selectedWallet, balance, updateBalance, solPrice, selectedCurrency } = useWalletStore();
-  const { optimalFee, isRefreshingFees, countdown, refreshFee } = useFeeMonitoring(visible);
+  const { optimalFee, isRefreshingFees, countdown } = useFeeMonitoring(visible);
 
   // Form state
   const [formState, setFormState] = useState(resetFormState());
   const [isLoading, setIsLoading] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [favorites, setFavorites] = useState<Contact[]>([]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Destructure form state for easier access
   const {
@@ -114,12 +118,17 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
     loadContacts();
   }, []);
 
-  // Reset form when modal opens
+  // Reset form when modal opens or set initial address if provided
   useEffect(() => {
     if (visible) {
-      setFormState(resetFormState());
+      const newState = resetFormState();
+      if (initialRecipientAddress) {
+        newState.recipientAddress = initialRecipientAddress;
+        newState.isValidatingAddress = true;
+      }
+      setFormState(newState);
     }
-  }, [visible]);
+  }, [visible, initialRecipientAddress]);
 
   // Validate recipient address
   const validateAddress = useCallback(async (address: string) => {
@@ -450,6 +459,7 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
               isValidAddress={isValidAddress}
               isValidatingAddress={isValidatingAddress}
               recipientBalance={recipientBalance}
+              onScanQRCode={() => setShowQRScanner(true)}
             />
 
             <GradientCard variant={CardVariant.ELEVATED} style={styles.card}>
@@ -489,9 +499,32 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
                         setFormState(prev => ({ ...prev, amount: text }));
                       }
                     }}
+                    onBlur={() => {
+                      // Evaluate math expression when user finishes typing (blur)
+                      const result = evaluateMathExpression(currentAmount);
+                      if (result !== null) {
+                        if (inputMode === InputMode.CURRENCY) {
+                          setFormState(prev => ({ ...prev, currencyAmount: result.toFixed(2) }));
+                        } else {
+                          setFormState(prev => ({ ...prev, amount: result.toString() }));
+                        }
+                      }
+                    }}
+                    onSubmitEditing={() => {
+                      // Evaluate math expression when user presses Enter
+                      const result = evaluateMathExpression(currentAmount);
+                      if (result !== null) {
+                        if (inputMode === InputMode.CURRENCY) {
+                          setFormState(prev => ({ ...prev, currencyAmount: result.toFixed(2) }));
+                        } else {
+                          setFormState(prev => ({ ...prev, amount: result.toString() }));
+                        }
+                      }
+                    }}
+                    returnKeyType='done'
                     placeholder={inputMode === InputMode.CURRENCY ? '0.00' : '0.0'}
                     placeholderTextColor={theme.text.LIGHT_GREY}
-                    keyboardType='decimal-pad'
+                    keyboardType='default'
                   />
                   <TouchableOpacity
                     style={styles.maxButton}
@@ -568,17 +601,6 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
                 style={styles.inputGroup}
               />
 
-              {/* Network Status */}
-              {optimalFee && (
-              <NetworkStatus
-                networkCongestion={optimalFee.networkCongestion}
-                estimatedTime={optimalFee.estimatedTime}
-                feeInSOL={optimalFee.feeInSOL}
-                countdown={countdown}
-                isRefreshing={isRefreshingFees}
-              />
-              )}
-
               {/* Privacy Notice */}
               <PrivacyNotice message='Memos are encrypted so only the recipient can read them. They are stored on-chain.' />
 
@@ -595,6 +617,16 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
                   solToCurrency={solToCurrency}
                 />
               )}
+              {/* Network Status */}
+              {optimalFee && (
+              <NetworkStatus
+                networkCongestion={optimalFee.networkCongestion}
+                estimatedTime={optimalFee.estimatedTime}
+                feeInSOL={optimalFee.feeInSOL}
+                countdown={countdown}
+                isRefreshing={isRefreshingFees}
+              />
+              )}
             </GradientCard>
 
             <GradientButton
@@ -608,6 +640,20 @@ export default function SendSolModal({ visible, onClose }: SendSolModalProps) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* QR Scanner */}
+      <QRScanner
+        visible={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={(data) => {
+          setFormState(prev => ({ 
+            ...prev, 
+            recipientAddress: data,
+            isValidatingAddress: data.trim() ? true : false,
+            isValidAddress: false
+          }));
+        }}
+      />
     </Modal>
   );
 }

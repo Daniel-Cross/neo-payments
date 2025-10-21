@@ -10,6 +10,8 @@ import WalletManagementModal from "./WalletManagementModal";
 import WalletInfoCard from "./WalletInfoCard";
 import UserInfoCard from "./UserInfoCard";
 import SendSolModal from "./SendSolModal";
+import QRScanner from "./QRScanner";
+import UserProfileModal from "./UserProfileModal";
 
 const WalletContent = () => {
   const { theme } = useTheme();
@@ -29,6 +31,9 @@ const WalletContent = () => {
 
   const [isWalletModalVisible, setIsWalletModalVisible] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [scannedAddress, setScannedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     // Update balance and price when component mounts
@@ -46,13 +51,21 @@ const WalletContent = () => {
     isLoading,
   ]);
 
+  // When a QR code is scanned, open the send modal with the address
+  useEffect(() => {
+    if (scannedAddress) {
+      setShowSendModal(true);
+      // Reset scanned address after opening modal
+      setScannedAddress(null);
+    }
+  }, [scannedAddress]);
+
   const handleSend = () => {
     setShowSendModal(true);
   };
 
   const handleScan = () => {
-    // TODO: Open QR scanner
-    console.log("Scan button pressed");
+    setShowQRScanner(true);
   };
 
   const handleWalletInfoPress = () => {
@@ -60,8 +73,7 @@ const WalletContent = () => {
   };
 
   const handleUserInfoPress = () => {
-    // TODO: Open user profile/settings modal
-    console.log("User info pressed");
+    setShowProfileModal(true);
   };
 
   return (
@@ -120,6 +132,23 @@ const WalletContent = () => {
       <SendSolModal
         visible={showSendModal}
         onClose={() => setShowSendModal(false)}
+        initialRecipientAddress={scannedAddress || undefined}
+      />
+
+      {/* QR Scanner */}
+      <QRScanner
+        visible={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={(data) => {
+          setScannedAddress(data);
+          setShowQRScanner(false);
+        }}
+      />
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        visible={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
       />
 
     </View>

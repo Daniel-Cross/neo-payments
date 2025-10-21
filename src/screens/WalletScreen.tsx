@@ -1,6 +1,8 @@
 import { View, StyleSheet, ScrollView } from "react-native";
+import { useState } from "react";
 import { useWalletScreen } from "../hooks/useWalletScreen";
 import SendSolModal from "../components/SendSolModal";
+import UserProfileModal from "../components/UserProfileModal";
 import WalletHeader from "../components/WalletHeader";
 import WalletBalanceCard from "../components/WalletBalanceCard";
 import WalletActions from "../components/WalletActions";
@@ -9,6 +11,8 @@ import ImportWalletForm from "../components/ImportWalletForm";
 import { ScreenTitle } from "../constants/enums";
 
 export default function WalletScreen() {
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  
   const {
     // State
     privateKeyInput,
@@ -55,9 +59,7 @@ export default function WalletScreen() {
 
           <WalletActions
             onSendSol={openSendModal}
-            onReceiveSol={() => {
-              /* TODO: Implement receive functionality */
-            }}
+            onReceiveSol={() => setShowProfileModal(true)}
           />
         </ScrollView>
         
@@ -65,6 +67,12 @@ export default function WalletScreen() {
         <SendSolModal
           visible={showSendModal}
           onClose={closeSendModal}
+        />
+
+        {/* User Profile Modal */}
+        <UserProfileModal
+          visible={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
         />
       </View>
     );

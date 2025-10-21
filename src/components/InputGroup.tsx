@@ -22,6 +22,8 @@ interface InputGroupProps {
   inputStyle?: any;
   showPasteButton?: boolean;
   onPaste?: () => void;
+  showScanButton?: boolean;
+  onScan?: () => void;
 }
 
 const InputGroup = ({
@@ -41,6 +43,8 @@ const InputGroup = ({
   inputStyle,
   showPasteButton = false,
   onPaste,
+  showScanButton = false,
+  onScan,
 }: InputGroupProps) => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -80,10 +84,24 @@ const InputGroup = ({
           autoCorrect={autoCorrect}
         />
         
+        {showScanButton && onScan && (
+          <TouchableOpacity
+            onPress={onScan}
+            style={styles.actionButton}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={20}
+              color={theme.text.SOFT_WHITE}
+            />
+          </TouchableOpacity>
+        )}
+        
         {showPasteButton && onPaste && (
           <TouchableOpacity
             onPress={onPaste}
-            style={styles.pasteButton}
+            style={styles.actionButton}
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons
@@ -157,7 +175,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   inputWithButton: {
     marginRight: 0,
   },
-  pasteButton: {
+  actionButton: {
     height: 44,
     width: 44,
     borderRadius: 8,

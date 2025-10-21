@@ -34,6 +34,7 @@ interface RecipientSelectionProps {
   isValidAddress: boolean;
   isValidatingAddress?: boolean;
   recipientBalance: number | null;
+  onScanQRCode?: () => void;
 }
 
 const RecipientSelection = ({
@@ -48,6 +49,7 @@ const RecipientSelection = ({
   isValidAddress,
   isValidatingAddress = false,
   recipientBalance,
+  onScanQRCode,
 }: RecipientSelectionProps) => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -96,6 +98,8 @@ const RecipientSelection = ({
         multiline
         showPasteButton={true}
         onPaste={handlePaste}
+        showScanButton={!!onScanQRCode}
+        onScan={onScanQRCode}
       />
     );
   };

@@ -70,7 +70,7 @@ export const useFeeMonitoring = (isActive: boolean) => {
         if (isActiveRef.current) {
           loadOptimalFee();
         }
-      }, 12000);
+      }, 20000);
       feeMonitoringIntervalRef.current = interval;
 
       // Start countdown timer

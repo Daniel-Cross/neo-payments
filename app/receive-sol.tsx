@@ -1,50 +1,24 @@
-import { Stack } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { Stack, router } from 'expo-router';
+import { View } from 'react-native';
+import { useEffect } from 'react';
 import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function ReceiveSolRoute() {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+
+  useEffect(() => {
+    router.back();
+  }, []);
 
   return (
     <>
       <Stack.Screen
         options={{
           title: 'Receive SOL',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#1a0b2e',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: '600',
-          },
+          headerShown: false,
         }}
       />
-      <View style={styles.container}>
-        <Text style={styles.title}>Receive SOL</Text>
-        <Text style={styles.subtitle}>Coming soon...</Text>
-      </View>
+      <View style={{ flex: 1, backgroundColor: theme.background.DARK_PURPLE }} />
     </>
   );
 }
-
-const createStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-  },
-});

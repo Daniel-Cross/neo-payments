@@ -78,7 +78,7 @@ const NetworkStatus = ({
         </Typography>
 
         <View style={styles.refreshContainer}>
-          {isRefreshing ? (
+          {/* {isRefreshing ? (
             <Typography variant={TypographyVariant.CAPTION} color={theme.text.LIGHT_GREY}>
               Getting latest gas fees...
             </Typography>
@@ -86,7 +86,7 @@ const NetworkStatus = ({
             <Typography variant={TypographyVariant.CAPTION} color={theme.text.DARK_GREY}>
               Next refresh in {countdown}s
             </Typography>
-          )}
+          )} */}
         </View>
       </View>
     </View>
