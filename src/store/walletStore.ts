@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import * as bip39 from 'bip39';
 import { SecureWalletStorage } from '../utils/secureStorage';
@@ -17,11 +16,24 @@ import {
 } from '../services/transactionService';
 import { deriveKeypairFromSeedPhrase } from '../utils/keyDerivation';
 
+// Verify polyfills are loaded before importing Solana
+if (typeof global.Buffer === 'undefined') {
+  throw new Error('CRITICAL: Buffer polyfill not loaded! Polyfills must be imported first.');
+}
+
+// Import Solana Web3.js AFTER polyfill verification
+import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+
 // Lazy-initialize Solana connection to avoid crashes during module loading
 let connection: Connection | null = null;
 const getConnection = (): Connection => {
   if (!connection) {
-    connection = new Connection(SolanaNetwork.MAINNET, ConnectionCommitment.CONFIRMED);
+    try {
+      connection = new Connection(SolanaNetwork.MAINNET, ConnectionCommitment.CONFIRMED);
+    } catch (error) {
+      console.error('CRITICAL: Failed to create Solana connection:', error);
+      throw new Error('Failed to initialize Solana connection. Please restart the app.');
+    }
   }
   return connection;
 };

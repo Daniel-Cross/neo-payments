@@ -1,5 +1,6 @@
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
+import { useUserStore } from "../store/userStore";
 import { Typography } from "./Typography";
 import { TypographyVariant } from "../constants/enums";
 import { EDGE_MARGIN, BASE_MARGIN } from "../constants/styles";
@@ -12,6 +13,11 @@ interface UserInfoCardProps {
 export default function UserInfoCard({ onPress }: UserInfoCardProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
+  const { profile, user } = useUserStore();
+
+  const username = profile?.username || 'anonymous';
+  const displayName = profile?.display_name || 'Anonymous User';
+  const phoneNumber = profile?.phone_number || user?.phone || 'Not provided';
 
   return (
     <TouchableOpacity
@@ -19,30 +25,32 @@ export default function UserInfoCard({ onPress }: UserInfoCardProps) {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.userInfoHeader}>
-        <Typography
-          variant={TypographyVariant.BODY_SMALL}
-          color={theme.text.LIGHT_GREY}
-        >
-          Profile
-        </Typography>
-        <MaterialCommunityIcons
-          name="chevron-down"
-          size={16}
-          color={theme.text.LIGHT_GREY}
-        />
+      <View style={styles.header}>
+        <View style={styles.userInfoHeader}>
+          <Typography
+            variant={TypographyVariant.BODY_SMALL}
+            color={theme.text.LIGHT_GREY}
+          >
+            Profile
+          </Typography>
+          <MaterialCommunityIcons
+            name="chevron-down"
+            size={16}
+            color={theme.text.LIGHT_GREY}
+          />
+        </View>
       </View>
       <Typography
         variant={TypographyVariant.BODY_MEDIUM}
         color={theme.text.SOFT_WHITE}
       >
-        Test Account
+        {displayName}
       </Typography>
       <Typography
-        variant={TypographyVariant.BODY_MEDIUM}
-        color={theme.text.SOFT_WHITE}
+        variant={TypographyVariant.BODY_SMALL}
+        color={theme.text.LIGHT_GREY}
       >
-        +46 000 00 00 00
+        {phoneNumber}
       </Typography>
     </TouchableOpacity>
   );
@@ -60,10 +68,26 @@ const createStyles = (theme: any) =>
       borderColor: theme.colors.NEON_PINK,
       minHeight: 120,
     },
+    header: {
+      width: '100%',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 8,
+    },
     userInfoHeader: {
-      justifyContent: "center",
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 8,
+      gap: 4,
+    },
+    userIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.background.PURPLE_ACCENT,
+      borderWidth: 2,
+      borderColor: theme.colors.NEON_PINK,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

@@ -12,7 +12,6 @@ export default {
     userInterfaceStyle: "dark",
     newArchEnabled: true,
     jsEngine: "hermes",
-
     splash: {
       image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
@@ -26,6 +25,8 @@ export default {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
           "Neo uses Face ID to securely protect your wallet private keys and authenticate sensitive operations.",
+        NSCameraUsageDescription:
+          "Neo needs access to your camera to scan QR codes.",
       },
     },
     android: {
@@ -37,7 +38,11 @@ export default {
       versionCode: parseInt(BUILD_NUMBER, 10),
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      permissions: ["USE_BIOMETRIC", "USE_FINGERPRINT"],
+      permissions: [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA",
+      ],
     },
     web: {
       favicon: "./assets/images/favicon.png",

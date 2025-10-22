@@ -22,12 +22,16 @@ Run these SQL commands in your Supabase SQL editor:
 -- Create profiles table
 CREATE TABLE public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT,
   phone_number TEXT,
   display_name TEXT,
-  avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Create index for username lookups
+CREATE INDEX idx_profiles_username ON public.profiles(username);
 
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -91,4 +95,3 @@ You can find these values in your Supabase project settings under **API**.
 - Use a production SMS provider
 - Set up monitoring and alerts
 - Configure proper security policies
-

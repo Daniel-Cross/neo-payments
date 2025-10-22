@@ -4,9 +4,10 @@ import { showSuccessToast, showErrorToast } from '../utils/toast';
 
 export interface UserProfile {
   id: string;
-  phone_number: string;
+  username: string;
+  email?: string;
+  phone_number?: string;
   display_name?: string;
-  avatar_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -24,14 +25,18 @@ interface UserState {
   setUser: (user: any | null) => void;
   setProfile: (profile: UserProfile | null) => void;
   setPhoneVerified: (verified: boolean) => void;
-  
+
   // Auth actions
   initializeAuth: () => Promise<void>;
   verifyPhoneNumber: (phoneNumber: string) => Promise<boolean>;
-  createUserProfile: (phoneNumber: string, displayName?: string) => Promise<boolean>;
+  createUserProfile: (
+    phoneNumber: string,
+    displayName?: string,
+    username?: string
+  ) => Promise<boolean>;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
   signOut: () => Promise<void>;
-  
+
   // Profile actions
   loadUserProfile: () => Promise<void>;
 }
@@ -54,34 +59,34 @@ export const useUserStore = create<UserState>((set, get) => ({
   initializeAuth: async () => {
     try {
       set({ isLoading: true });
-      
+
       // Get current user
       const userResult = await authService.getCurrentUser();
-      
+
       if (userResult.success && userResult.user) {
-        set({ 
-          user: userResult.user, 
+        set({
+          user: userResult.user,
           isAuthenticated: true,
-          phoneVerified: !!userResult.user.phone
+          phoneVerified: !!userResult.user.phone,
         });
-        
+
         // Load user profile
         await get().loadUserProfile();
       } else {
-        set({ 
-          user: null, 
-          isAuthenticated: false, 
+        set({
+          user: null,
+          isAuthenticated: false,
           profile: null,
-          phoneVerified: false 
+          phoneVerified: false,
         });
       }
     } catch (error) {
       console.error('Error initializing auth:', error);
-      set({ 
-        user: null, 
-        isAuthenticated: false, 
+      set({
+        user: null,
+        isAuthenticated: false,
         profile: null,
-        phoneVerified: false 
+        phoneVerified: false,
       });
     } finally {
       set({ isLoading: false });
@@ -92,11 +97,11 @@ export const useUserStore = create<UserState>((set, get) => ({
   verifyPhoneNumber: async (phoneNumber: string) => {
     try {
       set({ isLoading: true });
-      
+
       // The actual OTP verification is handled in the modal
       // This function is called after successful verification
       set({ phoneVerified: true });
-      
+
       return true;
     } catch (error) {
       console.error('Error verifying phone number:', error);
@@ -108,7 +113,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   // Create user profile
-  createUserProfile: async (phoneNumber: string, displayName?: string) => {
+  createUserProfile: async (phoneNumber: string, displayName?: string, username?: string) => {
     try {
       const { user } = get();
       if (!user) {
@@ -118,7 +123,11 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       set({ isLoading: true });
 
+      // Generate default username if not provided
+      const defaultUsername = username || `user_${user.id.slice(0, 8)}`;
+
       const result = await profileService.createProfile(user.id, {
+        username: defaultUsername,
         phone_number: phoneNumber,
         display_name: displayName || `User ${user.id.slice(0, 8)}`,
       });
@@ -200,11 +209,11 @@ export const useUserStore = create<UserState>((set, get) => ({
       const result = await authService.signOut();
 
       if (result.success) {
-        set({ 
-          user: null, 
-          isAuthenticated: false, 
+        set({
+          user: null,
+          isAuthenticated: false,
           profile: null,
-          phoneVerified: false 
+          phoneVerified: false,
         });
         showSuccessToast('Signed out successfully');
       } else {
@@ -218,4 +227,3 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 }));
-

@@ -10,6 +10,7 @@ import { Typography } from './Typography';
 import { GradientCard } from './GradientCard';
 import { GradientButton } from './GradientButton';
 import CloseButton from './CloseButton';
+import EditProfileModal from './EditProfileModal';
 import { showSuccessToast } from '../utils/toast';
 import { 
   TypographyVariant, 
@@ -30,11 +31,13 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
   const { profile, user } = useUserStore();
   const { selectedWallet } = useWalletStore();
   const [qrSize, setQrSize] = useState(200);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const walletAddress = selectedWallet?.publicKey || '';
+  const username = profile?.username || 'anonymous';
   const displayName = profile?.display_name || 'Anonymous User';
   const phoneNumber = profile?.phone_number || user?.phone || 'Not provided';
-  const email = user?.email || 'Not provided';
+  const email = profile?.email || user?.email || 'Not provided';
 
   const handleCopyAddress = async () => {
     if (!walletAddress) return;
@@ -56,6 +59,7 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
     }
   };
 
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={styles.container}>
@@ -74,15 +78,6 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
         >
           {/* User Info Card */}
           <GradientCard variant={CardVariant.ELEVATED} style={styles.card}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <MaterialCommunityIcons 
-                  name="account" 
-                  size={48} 
-                  color={theme.text.SOFT_WHITE} 
-                />
-              </View>
-            </View>
 
             <Typography 
               variant={TypographyVariant.HEADLINE_MEDIUM} 
@@ -90,6 +85,23 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
             >
               {displayName}
             </Typography>
+
+            <Typography 
+              variant={TypographyVariant.BODY_SMALL} 
+              color={theme.text.LIGHT_GREY}
+              style={styles.username}
+            >
+              @{username}
+            </Typography>
+
+            <GradientButton
+              title="Edit Profile"
+              onPress={() => setShowEditModal(true)}
+              variant={ButtonVariant.SECONDARY}
+              size={ButtonSize.SMALL}
+              style={styles.editButton}
+              icon={<MaterialCommunityIcons name="pencil" size={16} color="white" />}
+            />
 
             <View style={styles.infoSection}>
               <View style={styles.infoRow}>
@@ -252,6 +264,12 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
           </View>
         </ScrollView>
       </View>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+      />
     </Modal>
   );
 }
@@ -283,23 +301,16 @@ const createStyles = (theme: any) => StyleSheet.create({
     marginBottom: EDGE_MARGIN,
     padding: 24,
   },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.background.PURPLE_ACCENT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: theme.colors.NEON_PINK,
-  },
   displayName: {
     color: theme.text.SOFT_WHITE,
     textAlign: 'center',
+    marginBottom: 4,
+  },
+  username: {
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  editButton: {
     marginBottom: 24,
   },
   infoSection: {

@@ -1,7 +1,7 @@
 import { View, TextInput, StyleSheet, TextInputProps, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
-import { TypographyVariant } from '../constants/enums';
+import { TypographyVariant, InputMode } from '../constants/enums';
 import { BASE_MARGIN, EDGE_MARGIN } from '../constants/styles';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -18,12 +18,16 @@ interface InputGroupProps {
   keyboardType?: TextInputProps['keyboardType'];
   autoCapitalize?: TextInputProps['autoCapitalize'];
   autoCorrect?: boolean;
+  editable?: boolean;
+  mode?: InputMode;
   style?: any;
   inputStyle?: any;
   showPasteButton?: boolean;
   onPaste?: () => void;
   showScanButton?: boolean;
   onScan?: () => void;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 const InputGroup = ({
@@ -36,15 +40,19 @@ const InputGroup = ({
   isValidating = false,
   multiline = false,
   maxLength,
-  keyboardType = 'default',
-  autoCapitalize = 'sentences',
+  keyboardType: keyboardTypeProp,
+  autoCapitalize: autoCapitalizeProp,
   autoCorrect = true,
+  editable = true,
+  mode,
   style,
   inputStyle,
   showPasteButton = false,
   onPaste,
   showScanButton = false,
   onScan,
+  leftIcon,
+  rightIcon,
 }: InputGroupProps) => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -52,6 +60,21 @@ const InputGroup = ({
   const hasError = Boolean(error);
   const hasSuccess = Boolean(success);
   const hasValue = Boolean(value);
+
+  // Determine keyboard type and auto-capitalize based on mode
+  let keyboardType = keyboardTypeProp || 'default';
+  let autoCapitalize = autoCapitalizeProp || 'sentences';
+
+  if (mode === InputMode.EMAIL) {
+    keyboardType = 'email-address';
+    autoCapitalize = 'none';
+  } else if (mode === InputMode.PHONE) {
+    keyboardType = 'phone-pad';
+    autoCapitalize = 'none';
+  } else if (mode === InputMode.TEXT) {
+    keyboardType = 'default';
+    autoCapitalize = 'words';
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -65,12 +88,16 @@ const InputGroup = ({
       </Typography>
       
       <View style={styles.inputContainer}>
+        {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
+        
         <TextInput
           style={[
             styles.input,
             hasValue && hasError && styles.inputError,
             hasValue && hasSuccess && styles.inputSuccess,
             showPasteButton && styles.inputWithButton,
+            leftIcon && styles.inputWithLeftIcon,
+            !editable && styles.inputDisabled,
             inputStyle,
           ]}
           value={value}
@@ -82,7 +109,10 @@ const InputGroup = ({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
+          editable={editable}
         />
+
+        {rightIcon && <View style={styles.rightIconContainer}>{rightIcon}</View>}
         
         {showScanButton && onScan && (
           <TouchableOpacity
@@ -161,6 +191,16 @@ const createStyles = (theme: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  leftIconContainer: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  rightIconContainer: {
+    position: 'absolute',
+    right: 12,
+    zIndex: 1,
+  },
   input: {
     flex: 1,
     borderWidth: 1,
@@ -174,6 +214,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   inputWithButton: {
     marginRight: 0,
+  },
+  inputWithLeftIcon: {
+    paddingLeft: 44,
+  },
+  inputDisabled: {
+    opacity: 0.6,
+    backgroundColor: theme.background.PURPLE_ACCENT,
   },
   actionButton: {
     height: 44,

@@ -1,3 +1,14 @@
+import { SolanaNetwork, ConnectionCommitment, NetworkCongestion } from '../constants/enums';
+import nacl from 'tweetnacl';
+import ed2curve from 'ed2curve';
+import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
+
+// Verify polyfills are loaded before importing Solana
+if (typeof global.Buffer === 'undefined') {
+  throw new Error('CRITICAL: Buffer polyfill not loaded! Polyfills must be imported first.');
+}
+
+// Import Solana Web3.js AFTER polyfill verification
 import {
   Connection,
   PublicKey,
@@ -11,10 +22,6 @@ import {
   TransactionMessage,
   Keypair,
 } from '@solana/web3.js';
-import { SolanaNetwork, ConnectionCommitment, NetworkCongestion } from '../constants/enums';
-import nacl from 'tweetnacl';
-import ed2curve from 'ed2curve';
-import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 
 // Official Solana Memo Program v1
 // https://spl.solana.com/memo
@@ -22,21 +29,31 @@ import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-ut
 let MEMO_PROGRAM_ID: PublicKey | null = null;
 const getMemoProgram = (): PublicKey => {
   if (!MEMO_PROGRAM_ID) {
-    MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
+    try {
+      MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
+    } catch (error) {
+      console.error('CRITICAL: Failed to create Memo Program PublicKey:', error);
+      throw new Error('Failed to initialize Memo Program. Please restart the app.');
+    }
   }
   return MEMO_PROGRAM_ID;
 };
 
 // Lazy-initialize connection to avoid crashes during module loading
 const createConnection = (network: SolanaNetwork = SolanaNetwork.MAINNET): Connection => {
-  return new Connection(network, {
-    commitment: ConnectionCommitment.CONFIRMED,
-    confirmTransactionInitialTimeout: 60000, // 60 seconds
-    disableRetryOnRateLimit: false,
-    httpHeaders: {
-      'User-Agent': 'Neo-Payments-Wallet/1.0',
-    },
-  });
+  try {
+    return new Connection(network, {
+      commitment: ConnectionCommitment.CONFIRMED,
+      confirmTransactionInitialTimeout: 60000, // 60 seconds
+      disableRetryOnRateLimit: false,
+      httpHeaders: {
+        'User-Agent': 'Neo-Payments-Wallet/1.0',
+      },
+    });
+  } catch (error) {
+    console.error('CRITICAL: Failed to create Solana connection:', error);
+    throw new Error('Failed to initialize Solana connection. Please restart the app.');
+  }
 };
 
 export interface TransferParams {

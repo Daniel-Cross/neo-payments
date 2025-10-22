@@ -6,7 +6,6 @@ import { useFonts } from "expo-font";
 import Toast from "react-native-toast-message";
 import { ThemeProvider, useTheme } from "../src/contexts/ThemeContext";
 import { toastConfig } from "../src/utils/toast";
-import "../src/utils/polyfills";
 import { useWalletStore } from "../src/store/walletStore";
 
 export default function RootLayout() {
