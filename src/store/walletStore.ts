@@ -17,8 +17,14 @@ import {
 } from '../services/transactionService';
 import { deriveKeypairFromSeedPhrase } from '../utils/keyDerivation';
 
-// Solana mainnet connection
-const connection = new Connection(SolanaNetwork.MAINNET, ConnectionCommitment.CONFIRMED);
+// Lazy-initialize Solana connection to avoid crashes during module loading
+let connection: Connection | null = null;
+const getConnection = (): Connection => {
+  if (!connection) {
+    connection = new Connection(SolanaNetwork.MAINNET, ConnectionCommitment.CONFIRMED);
+  }
+  return connection;
+};
 
 export interface Wallet {
   id: string;
@@ -615,7 +621,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
 
     try {
-      const balance = await connection.getBalance(selectedWallet.keypair.publicKey);
+      const balance = await getConnection().getBalance(selectedWallet.keypair.publicKey);
       const solBalance = balance / LAMPORTS_PER_SOL;
 
       // Update the balance for the selected wallet
@@ -657,7 +663,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
               wallet.name
             } (${wallet.publicKey.slice(0, 8)}...)`
           );
-          const balance = await connection.getBalance(wallet.keypair.publicKey);
+          const balance = await getConnection().getBalance(wallet.keypair.publicKey);
           const solBalance = balance / LAMPORTS_PER_SOL;
           console.log(`[updateAllBalances] Wallet ${wallet.name} balance: ${solBalance} SOL`);
           return { ...wallet, balance: solBalance };

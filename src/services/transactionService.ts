@@ -18,17 +18,26 @@ import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-ut
 
 // Official Solana Memo Program v1
 // https://spl.solana.com/memo
-const MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
+// Lazy-initialize to avoid crashes during module loading
+let MEMO_PROGRAM_ID: PublicKey | null = null;
+const getMemoProgram = (): PublicKey => {
+  if (!MEMO_PROGRAM_ID) {
+    MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo');
+  }
+  return MEMO_PROGRAM_ID;
+};
 
-// Connection to Solana network with proper configuration
-const connection = new Connection(SolanaNetwork.MAINNET, {
-  commitment: ConnectionCommitment.CONFIRMED,
-  confirmTransactionInitialTimeout: 60000, // 60 seconds
-  disableRetryOnRateLimit: false,
-  httpHeaders: {
-    'User-Agent': 'Neo-Payments-Wallet/1.0',
-  },
-});
+// Lazy-initialize connection to avoid crashes during module loading
+const createConnection = (network: SolanaNetwork = SolanaNetwork.MAINNET): Connection => {
+  return new Connection(network, {
+    commitment: ConnectionCommitment.CONFIRMED,
+    confirmTransactionInitialTimeout: 60000, // 60 seconds
+    disableRetryOnRateLimit: false,
+    httpHeaders: {
+      'User-Agent': 'Neo-Payments-Wallet/1.0',
+    },
+  });
+};
 
 export interface TransferParams {
   from: PublicKey;
@@ -68,7 +77,8 @@ export class TransactionService {
   private connection: Connection;
 
   constructor() {
-    this.connection = connection;
+    // Lazy-initialize connection only when needed
+    this.connection = createConnection();
   }
 
   public static getInstance(): TransactionService {
@@ -82,14 +92,7 @@ export class TransactionService {
    * Switch network (useful for testing on devnet)
    */
   public switchNetwork(network: SolanaNetwork): void {
-    this.connection = new Connection(network, {
-      commitment: ConnectionCommitment.CONFIRMED,
-      confirmTransactionInitialTimeout: 60000,
-      disableRetryOnRateLimit: false,
-      httpHeaders: {
-        'User-Agent': 'Neo-Payments-Wallet/1.0',
-      },
-    });
+    this.connection = createConnection(network);
   }
 
   /**
@@ -128,7 +131,7 @@ export class TransactionService {
     if (memo) {
       const memoInstruction = new TransactionInstruction({
         keys: [],
-        programId: MEMO_PROGRAM_ID,
+        programId: getMemoProgram(),
         data: Buffer.from(memo, 'utf8'),
       });
       transaction.add(memoInstruction);
@@ -167,7 +170,7 @@ export class TransactionService {
       instructions.push(
         new TransactionInstruction({
           keys: [],
-          programId: MEMO_PROGRAM_ID,
+          programId: getMemoProgram(),
           data: Buffer.from(memo, 'utf8'),
         })
       );
