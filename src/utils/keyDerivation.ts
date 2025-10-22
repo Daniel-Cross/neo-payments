@@ -67,23 +67,44 @@ export const derivePublicKeyFromPrivateKey = (privateKeyInput: string): string =
 };
 
 const deriveEd25519Key = (seed: Buffer | Uint8Array, path: string): Uint8Array => {
-  const seedBytes = seed instanceof Uint8Array ? seed : new Uint8Array(seed);
+  try {
+    const seedBytes = seed instanceof Uint8Array ? seed : new Uint8Array(seed);
 
-  const MASTER_KEY = new TextEncoder().encode('ed25519 seed');
-  let I = hmac(sha512, MASTER_KEY, seedBytes); // key, data order
-  let privKey = I.slice(0, 32);
-  let chainCode = I.slice(32);
+    if (!seedBytes || seedBytes.length === 0) {
+      throw new Error('Invalid seed: seed cannot be empty');
+    }
 
-  const parts = path.split('/').slice(1); // skip 'm'
-  for (const part of parts) {
-    const index = (parseInt(part.replace("'", ''), 10) + 0x80000000) >>> 0;
-    const data = Buffer.concat([Buffer.from([0x00]), Buffer.from(privKey), Buffer.alloc(4)]);
-    data.writeUInt32BE(index, data.length - 4);
-    I = hmac(sha512, chainCode, data);
-    privKey = I.slice(0, 32);
-    chainCode = I.slice(32);
+    const MASTER_KEY = new TextEncoder().encode('ed25519 seed');
+    let I = hmac(sha512, MASTER_KEY, seedBytes); // key, data order
+    let privKey = I.slice(0, 32);
+    let chainCode = I.slice(32);
+
+    if (!path || typeof path !== 'string') {
+      throw new Error('Invalid derivation path');
+    }
+
+    const parts = path.split('/').slice(1); // skip 'm'
+    for (const part of parts) {
+      if (!part) continue;
+
+      const index = (parseInt(part.replace("'", ''), 10) + 0x80000000) >>> 0;
+
+      if (isNaN(index)) {
+        throw new Error(`Invalid derivation path component: ${part}`);
+      }
+
+      const data = Buffer.concat([Buffer.from([0x00]), Buffer.from(privKey), Buffer.alloc(4)]);
+      data.writeUInt32BE(index, data.length - 4);
+      I = hmac(sha512, chainCode, data);
+      privKey = I.slice(0, 32);
+      chainCode = I.slice(32);
+    }
+    return privKey;
+  } catch (error) {
+    throw new Error(
+      `Failed to derive Ed25519 key: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
-  return privKey;
 };
 
 /**
