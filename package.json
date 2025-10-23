@@ -11,10 +11,7 @@
     "build-android": "./build-and-run-android.sh",
     "prebuild-ios": "chmod +x ./build-and-run-ios.sh",
     "build-ios": "./build-and-run-ios.sh",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
-    "type-check": "tsc --noEmit",
-    "check": "npm run type-check && npm run lint"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@noble/ed25519": "^3.0.0",
@@ -65,8 +62,6 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "eslint": "^8.0.0",
-    "eslint-config-expo": "^7.0.0",
     "typescript": "~5.9.2"
   },
   "private": true
