@@ -68,10 +68,9 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      ### This set some secrets although the values are not necessarily secret,
-      ### but is currently the only way of passing dynamic variables when using eas build
-      - run: eas secret:create --scope=project --name=EXPO_PUBLIC_BUILD_NUMBER --value=${{ github.RUN_NUMBER }} --type=string --force
-      - run: eas secret:create --scope=project --name=EXPO_PUBLIC_GIT_COMMIT_SHA --value=$GIT_COMMIT_SHA --type=string --force
+      ### This set some environment variables for the build
+      - run: eas env:create --name=EXPO_PUBLIC_BUILD_NUMBER --value=${{ github.RUN_NUMBER }} --environment=$TARGET_ENVIRONMENT --force
+      - run: eas env:create --name=EXPO_PUBLIC_GIT_COMMIT_SHA --value=$GIT_COMMIT_SHA --environment=$TARGET_ENVIRONMENT --force
 
       - name: Build with deploy
         run: eas build --profile $TARGET_ENVIRONMENT --platform ${{ github.event.inputs.platform }} --auto-submit --non-interactive --no-wait
