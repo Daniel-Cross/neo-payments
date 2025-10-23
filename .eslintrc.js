@@ -15,6 +15,7 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
     'react-hooks/exhaustive-deps': 'warn',
+    '@typescript-eslint/no-misused-promises': 'off',
   },
   ignorePatterns: [
     'node_modules/',

@@ -1,3 +1,6 @@
+// Import crypto initialization first
+import './cryptoInit';
+
 import * as SecureStore from 'expo-secure-store';
 import { Keypair } from '@solana/web3.js';
 import { StorageKey, SecureStorageService, AuthPrompt } from '../constants/enums';

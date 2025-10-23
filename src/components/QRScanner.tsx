@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Typography } from './Typography';
 import { GradientButton } from './GradientButton';
 import { TypographyVariant, ButtonVariant, ButtonSize } from '../constants/enums';
+import { extractWalletAddress } from '../utils/deepLinkHandler';
 
 interface QRScannerProps {
   visible: boolean;
@@ -35,7 +36,17 @@ export default function QRScanner({ visible, onClose, onScan }: QRScannerProps) 
     if (scanned) return;
     
     setScanned(true);
-    onScan(data);
+    
+    // Extract wallet address from the scanned data (could be deep link or raw address)
+    const walletAddress = extractWalletAddress(data);
+    
+    if (walletAddress) {
+      onScan(walletAddress);
+    } else {
+      // If no valid wallet address found, pass the raw data
+      onScan(data);
+    }
+    
     onClose();
   };
 

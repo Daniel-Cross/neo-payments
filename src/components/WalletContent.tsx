@@ -12,7 +12,6 @@ import UserInfoCard from "./UserInfoCard";
 import SendSolModal from "./SendSolModal";
 import QRScanner from "./QRScanner";
 import UserProfileModal from "./UserProfileModal";
-
 const WalletContent = () => {
   const { theme } = useTheme();
   const styles = createStyles(theme);
@@ -59,6 +58,7 @@ const WalletContent = () => {
       setScannedAddress(null);
     }
   }, [scannedAddress]);
+
 
   const handleSend = () => {
     setShowSendModal(true);

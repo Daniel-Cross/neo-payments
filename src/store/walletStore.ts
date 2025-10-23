@@ -1,3 +1,6 @@
+// Import crypto initialization first
+import '../utils/cryptoInit';
+
 import { create } from 'zustand';
 import bs58 from 'bs58';
 import * as bip39 from 'bip39';

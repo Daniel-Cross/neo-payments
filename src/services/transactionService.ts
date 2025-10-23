@@ -1,3 +1,6 @@
+// Import crypto initialization first
+import '../utils/cryptoInit';
+
 import { SolanaNetwork, ConnectionCommitment, NetworkCongestion } from '../constants/enums';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';

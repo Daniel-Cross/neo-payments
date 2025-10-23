@@ -1,3 +1,7 @@
+// Import crypto initialization first
+import './cryptoInit';
+
+// Now import crypto libraries (they're already initialized)
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import * as bip39 from 'bip39';

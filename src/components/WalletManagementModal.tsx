@@ -458,4 +458,7 @@ const createStyles = (theme: any) =>
     copySecretButton: {
       marginTop: 8,
     },
+    closeButton: {
+      padding: 8,
+    },
   });

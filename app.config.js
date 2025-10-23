@@ -64,5 +64,8 @@ export default {
       ],
     ],
     scheme: "neo",
+    linking: {
+      prefixes: ["neo://", "https://neo.app"],
+    },
   },
 };

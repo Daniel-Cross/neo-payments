@@ -1,4 +1,4 @@
-import { View, StyleSheet, Modal, ScrollView, TouchableOpacity, Share } from 'react-native';
+import { View, StyleSheet, Modal, ScrollView, Share } from 'react-native';
 import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -12,6 +12,7 @@ import { GradientButton } from './GradientButton';
 import CloseButton from './CloseButton';
 import EditProfileModal from './EditProfileModal';
 import { showSuccessToast } from '../utils/toast';
+import { generateReceiveDeepLink } from '../utils/deepLinkHandler';
 import { 
   TypographyVariant, 
   CardVariant, 
@@ -182,7 +183,7 @@ export default function UserProfileModal({ visible, onClose }: UserProfileModalP
               <View style={styles.qrContainer}>
                 <View style={styles.qrWrapper}>
                   <QRCode
-                    value={walletAddress}
+                    value={generateReceiveDeepLink(walletAddress)}
                     size={qrSize}
                     backgroundColor="white"
                     color="#1a0b2e"

@@ -5,9 +5,13 @@ import { GradientBackground } from "../components/GradientBackground";
 import OnboardingContent from "../components/OnboardingContent";
 import WalletContent from "../components/WalletContent";
 import { GradientType } from "../constants/enums";
+import { useDeepLink } from "../hooks/useDeepLink";
 
 const HomeScreen = () => {
   const { isConnected } = useWalletStore();
+  
+  // Initialize deep link handling (this will handle navigation automatically)
+  useDeepLink();
 
   return (
     <GradientBackground

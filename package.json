@@ -10,7 +10,11 @@
     "prebuild-android": "chmod +x ./build-and-run-android.sh",
     "build-android": "./build-and-run-android.sh",
     "prebuild-ios": "chmod +x ./build-and-run-ios.sh",
-    "build-ios": "./build-and-run-ios.sh"
+    "build-ios": "./build-and-run-ios.sh",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "type-check": "tsc --noEmit",
+    "check": "npm run type-check && npm run lint"
   },
   "dependencies": {
     "@noble/ed25519": "^3.0.0",
@@ -40,6 +44,7 @@
     "expo-secure-store": "^15.0.7",
     "expo-status-bar": "~3.0.8",
     "lottie-react-native": "~7.3.1",
+    "process": "^0.11.10",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
@@ -53,12 +58,15 @@
     "react-native-toast-message": "^2.3.3",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-worklets": "0.5.1",
+    "text-encoding": "^0.7.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eslint": "^8.0.0",
+    "eslint-config-expo": "^7.0.0",
     "typescript": "~5.9.2"
   },
   "private": true

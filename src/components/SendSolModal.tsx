@@ -1,3 +1,6 @@
+// Import crypto initialization first
+import '../utils/cryptoInit';
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
@@ -60,6 +63,8 @@ interface SendSolModalProps {
   visible: boolean;
   onClose: () => void;
   initialRecipientAddress?: string;
+  initialAmount?: string;
+  initialMemo?: string;
 }
 
 // Helper functions
@@ -79,7 +84,7 @@ const resetFormState = () => ({
   selectedRecipientType: RecipientType.WALLET_ADDRESS,
 });
 
-export default function SendSolModal({ visible, onClose, initialRecipientAddress }: SendSolModalProps) {
+export default function SendSolModal({ visible, onClose, initialRecipientAddress, initialAmount, initialMemo }: SendSolModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
@@ -118,7 +123,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     loadContacts();
   }, []);
 
-  // Reset form when modal opens or set initial address if provided
+  // Reset form when modal opens or set initial values if provided
   useEffect(() => {
     if (visible) {
       const newState = resetFormState();
@@ -126,9 +131,16 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
         newState.recipientAddress = initialRecipientAddress;
         newState.isValidatingAddress = true;
       }
+      if (initialAmount) {
+        newState.amount = initialAmount;
+        newState.isValidAmount = true;
+      }
+      if (initialMemo) {
+        newState.memo = initialMemo;
+      }
       setFormState(newState);
     }
-  }, [visible, initialRecipientAddress]);
+  }, [visible, initialRecipientAddress, initialAmount, initialMemo]);
 
   // Validate recipient address
   const validateAddress = useCallback(async (address: string) => {

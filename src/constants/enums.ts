@@ -268,3 +268,10 @@ export enum RecipientSelectionText {
   ADD_TO_FAVORITES = 'Add to Favorites',
   REMOVE_FROM_FAVORITES = 'Remove from Favorites',
 }
+
+// Deep link enums
+export enum DeepLinkType {
+  SEND = 'send',
+  RECEIVE = 'receive',
+  UNKNOWN = 'unknown',
+}
