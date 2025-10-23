@@ -11,7 +11,6 @@ export default {
     icon: "./assets/images/ios.png",
     userInterfaceStyle: "dark",
     newArchEnabled: true,
-    jsEngine: "hermes",
     splash: {
       image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
@@ -21,6 +20,7 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.appforge.neo",
       buildNumber: BUILD_NUMBER,
+      jsEngine: "jsc",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
@@ -38,6 +38,7 @@ export default {
       versionCode: parseInt(BUILD_NUMBER, 10),
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
+      jsEngine: "hermes",
       permissions: [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
