@@ -6,10 +6,10 @@ import bs58 from 'bs58';
 import * as bip39 from 'bip39';
 import { SecureWalletStorage } from '../utils/secureStorage';
 import {
-  SolanaNetwork,
   ConnectionCommitment,
   NetworkCongestion,
   Currency,
+  SOLANA_RPC_ENDPOINTS,
 } from '../constants/enums';
 import { priceService } from '../utils/priceService';
 import {
@@ -27,18 +27,70 @@ if (typeof global.Buffer === 'undefined') {
 // Import Solana Web3.js AFTER polyfill verification
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 
-// Lazy-initialize Solana connection to avoid crashes during module loading
-let connection: Connection | null = null;
-const getConnection = (): Connection => {
-  if (!connection) {
+// Note: getConnection function removed as it's no longer used
+// We now use getBalanceWithFallback for all balance operations
+
+// Test basic network connectivity
+const testNetworkConnectivity = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch('https://httpbin.org/get', {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    await response.json();
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Helper function to get balance with fallback endpoints
+const getBalanceWithFallback = async (publicKey: PublicKey): Promise<number> => {
+  let lastError: Error | null = null;
+  // First test basic network connectivity
+  const isNetworkAvailable = await testNetworkConnectivity();
+  if (!isNetworkAvailable) {
+    throw new Error('No network connectivity available');
+  }
+
+  for (let i = 0; i < SOLANA_RPC_ENDPOINTS.length; i++) {
     try {
-      connection = new Connection(SolanaNetwork.MAINNET, ConnectionCommitment.CONFIRMED);
+      const endpoint = SOLANA_RPC_ENDPOINTS[i];
+
+      const connection = new Connection(endpoint, {
+        commitment: ConnectionCommitment.CONFIRMED,
+        confirmTransactionInitialTimeout: 5000, // 5 seconds timeout for faster failover
+        disableRetryOnRateLimit: false,
+        httpHeaders: {
+          'User-Agent': 'Neo-Payments-Wallet/1.0',
+        },
+      });
+
+      // First test if we can get the latest blockhash (basic connectivity test)
+      try {
+        await connection.getLatestBlockhash();
+      } catch (connectivityError) {
+        throw connectivityError; // Skip to next endpoint
+      }
+
+      const balance = await connection.getBalance(publicKey);
+      return balance / LAMPORTS_PER_SOL;
     } catch (error) {
-      console.error('CRITICAL: Failed to create Solana connection:', error);
-      throw new Error('Failed to initialize Solana connection. Please restart the app.');
+      lastError = error as Error;
+
+      // If this is not the last attempt, wait a bit
+      if (i < SOLANA_RPC_ENDPOINTS.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   }
-  return connection;
+
+  return 0; // Return 0 instead of throwing error to prevent app crashes
 };
 
 export interface Wallet {
@@ -335,10 +387,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         throw new Error('Invalid seed phrase');
       }
 
-      // Generate seed from mnemonic
-      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
-      const seedBytes = seed.slice(0, 32);
-
       const newWallets: Wallet[] = [];
       const walletCount = 5; // Always generate 5 addresses automatically
       const baseWalletName = name || generateWalletName(wallets, 'imported');
@@ -396,9 +444,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       });
 
       // Update balances for all wallets after import
-      console.log(
-        `[importWalletFromSeedPhrase] Imported ${newWallets.length} wallets, updating balances...`
-      );
       setTimeout(() => {
         get().updateAllBalances();
       }, 100);
@@ -636,8 +681,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
 
     try {
-      const balance = await getConnection().getBalance(selectedWallet.keypair.publicKey);
-      const solBalance = balance / LAMPORTS_PER_SOL;
+      const solBalance = await getBalanceWithFallback(selectedWallet.keypair.publicKey);
 
       // Update the balance for the selected wallet
       const updatedWallets = wallets.map(wallet =>
@@ -662,35 +706,28 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   // Update balances for all wallets
   updateAllBalances: async () => {
     const { wallets } = get();
-    console.log(`[updateAllBalances] Starting balance update for ${wallets.length} wallets`);
 
     if (wallets.length === 0) {
-      console.log('[updateAllBalances] No wallets to update');
       return;
     }
 
     try {
-      // Create promises for all balance updates
-      const balancePromises = wallets.map(async wallet => {
+      // Process balance updates sequentially to avoid rate limiting
+      const updatedWallets = [];
+      for (let i = 0; i < wallets.length; i++) {
         try {
-          console.log(
-            `[updateAllBalances] Fetching balance for wallet ${
-              wallet.name
-            } (${wallet.publicKey.slice(0, 8)}...)`
-          );
-          const balance = await getConnection().getBalance(wallet.keypair.publicKey);
-          const solBalance = balance / LAMPORTS_PER_SOL;
-          console.log(`[updateAllBalances] Wallet ${wallet.name} balance: ${solBalance} SOL`);
-          return { ...wallet, balance: solBalance };
-        } catch (error) {
-          console.error(`Failed to update balance for wallet ${wallet.id}:`, error);
-          return wallet; // Return original wallet if balance update fails
-        }
-      });
+          const wallet = wallets[i];
+          const solBalance = await getBalanceWithFallback(wallet.keypair.publicKey);
+          updatedWallets.push({ ...wallet, balance: solBalance });
 
-      // Wait for all balance updates to complete
-      const updatedWallets = await Promise.all(balancePromises);
-      console.log(`[updateAllBalances] Updated ${updatedWallets.length} wallets`);
+          // Add delay between requests to avoid rate limiting (except for the last one)
+          if (i < wallets.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+          }
+        } catch (error) {
+          updatedWallets.push(wallets[i]); // Return original wallet if balance update fails
+        }
+      }
 
       // Get current SOL price to calculate USD value
       const { solPrice, selectedWallet } = get();
@@ -702,12 +739,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         fiatValue: (selectedWalletUpdated?.balance || 0) * solPrice,
         lastBalanceUpdate: Date.now(),
       });
-
-      console.log(
-        `[updateAllBalances] Balance update complete. Selected wallet balance: ${
-          selectedWalletUpdated?.balance || 0
-        } SOL`
-      );
     } catch (error) {
       console.error('Failed to update all balances:', error);
     }
@@ -715,7 +746,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
   // Debug method to manually refresh all balances
   refreshAllBalances: async () => {
-    console.log('[refreshAllBalances] Manual balance refresh triggered');
     await get().updateAllBalances();
   },
 
@@ -727,7 +757,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         throw new Error('Invalid seed phrase');
       }
 
-      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
       const addresses: string[] = [];
 
       for (let i = 0; i < 5; i++) {
@@ -736,7 +765,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
         addresses.push(keypair.publicKey.toString());
       }
 
-      console.log('[testDerivation] Generated addresses:', addresses);
       return addresses;
     } catch (error) {
       console.error('[testDerivation] Error:', error);
@@ -919,10 +947,6 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       if (!bip39.validateMnemonic(cleanSeedPhrase)) {
         throw new Error('Invalid seed phrase');
       }
-
-      // Generate seed from mnemonic
-      const seed = await bip39.mnemonicToSeed(cleanSeedPhrase);
-      const seedBytes = seed.slice(0, 32);
 
       // Find existing wallets from this seed phrase to determine next derivation path
       const existingWallets = wallets.filter(w => w.seedPhrase === cleanSeedPhrase);

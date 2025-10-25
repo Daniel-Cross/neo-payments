@@ -167,6 +167,12 @@ export enum SolanaNetwork {
   TESTNET = 'https://api.testnet.solana.com',
 }
 
+// Fallback RPC endpoints for better reliability
+export const SOLANA_RPC_ENDPOINTS = [
+  'https://api.mainnet-beta.solana.com',
+  'https://solana-api.projectserum.com',
+] as const;
+
 export enum ConnectionCommitment {
   CONFIRMED = 'confirmed',
   FINALIZED = 'finalized',

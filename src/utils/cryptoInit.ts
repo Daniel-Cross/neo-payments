@@ -39,24 +39,18 @@ export const verifyCryptoLibraries = (): boolean => {
       throw new Error('Solana Keypair is not working');
     }
 
-    console.log('✅ All crypto libraries verified successfully');
     return true;
   } catch (error) {
-    console.error('❌ Crypto library verification failed:', error);
     return false;
   }
 };
 
 // Initialize crypto libraries
 export const initializeCrypto = (): void => {
-  console.log('🔧 Initializing crypto libraries...');
-
   const success = verifyCryptoLibraries();
   if (!success) {
     throw new Error('Failed to initialize crypto libraries');
   }
-
-  console.log('✅ Crypto libraries initialized successfully');
 };
 
 // Auto-initialize when this module is imported

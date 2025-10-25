@@ -48,9 +48,29 @@ if (typeof global.crypto === 'undefined') {
 // Additional Hermes-specific polyfills
 if (typeof global.process === 'undefined') {
   try {
-    global.process = require('process');
+    const processPolyfill = require('process');
+    // @ts-ignore - Process polyfill for React Native
+    global.process = {
+      ...processPolyfill,
+      nextTick: processPolyfill.nextTick || ((fn: Function) => setTimeout(fn, 0)),
+      env: processPolyfill.env || { NODE_ENV: 'development' },
+      version: processPolyfill.version || 'v16.0.0',
+    };
   } catch (error) {
-    console.warn('Failed to load process polyfill:', error);
+    console.warn('Failed to load process polyfill from npm package:', error);
+    // Fallback minimal process polyfill
+    // @ts-ignore - Process polyfill for React Native
+    global.process = {
+      nextTick: (fn: Function) => setTimeout(fn, 0),
+      env: { NODE_ENV: 'development' },
+      version: 'v16.0.0',
+    };
+  }
+} else {
+  // Ensure nextTick is available even if process exists
+  if (typeof global.process.nextTick !== 'function') {
+    // @ts-ignore - Adding nextTick to existing process
+    global.process.nextTick = (fn: Function) => setTimeout(fn, 0);
   }
 }
 
@@ -80,8 +100,6 @@ try {
   if (typeof TextEncoder === 'undefined' || typeof TextDecoder === 'undefined') {
     console.warn('WARNING: TextEncoder/TextDecoder polyfills are not available');
   }
-
-  console.log('✅ All polyfills loaded successfully');
 } catch (error) {
   console.error('CRITICAL: Polyfill verification failed:', error);
   throw error;

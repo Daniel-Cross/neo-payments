@@ -54,8 +54,7 @@ const WalletContent = () => {
   useEffect(() => {
     if (scannedAddress) {
       setShowSendModal(true);
-      // Reset scanned address after opening modal
-      setScannedAddress(null);
+      // Don't reset scannedAddress immediately - let the modal use it first
     }
   }, [scannedAddress]);
 
@@ -131,7 +130,10 @@ const WalletContent = () => {
       {/* Send SOL Modal */}
       <SendSolModal
         visible={showSendModal}
-        onClose={() => setShowSendModal(false)}
+        onClose={() => {
+          setShowSendModal(false);
+          setScannedAddress(null); // Reset scanned address when modal closes
+        }}
         initialRecipientAddress={scannedAddress || undefined}
       />
 

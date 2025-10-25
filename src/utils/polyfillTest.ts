@@ -6,8 +6,6 @@
 import './polyfills';
 
 export const testPolyfills = (): boolean => {
-  console.log('🧪 Testing polyfills...');
-
   const tests = [
     {
       name: 'Buffer',
@@ -61,22 +59,12 @@ export const testPolyfills = (): boolean => {
   for (const test of tests) {
     try {
       const result = test.test();
-      if (result) {
-        console.log(`✅ ${test.name}: PASS`);
-      } else {
-        console.log(`❌ ${test.name}: FAIL`);
+      if (!result) {
         allPassed = false;
       }
     } catch (error) {
-      console.log(`❌ ${test.name}: ERROR - ${error}`);
       allPassed = false;
     }
-  }
-
-  if (allPassed) {
-    console.log('🎉 All polyfill tests passed!');
-  } else {
-    console.log('💥 Some polyfill tests failed!');
   }
 
   return allPassed;

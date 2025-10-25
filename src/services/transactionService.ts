@@ -1,7 +1,12 @@
 // Import crypto initialization first
 import '../utils/cryptoInit';
 
-import { SolanaNetwork, ConnectionCommitment, NetworkCongestion } from '../constants/enums';
+import {
+  SolanaNetwork,
+  ConnectionCommitment,
+  NetworkCongestion,
+  SOLANA_RPC_ENDPOINTS,
+} from '../constants/enums';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
 import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
@@ -45,7 +50,10 @@ const getMemoProgram = (): PublicKey => {
 // Lazy-initialize connection to avoid crashes during module loading
 const createConnection = (network: SolanaNetwork = SolanaNetwork.MAINNET): Connection => {
   try {
-    return new Connection(network, {
+    // Use the first endpoint for now, we'll add fallback logic later
+    const endpoint = network === SolanaNetwork.MAINNET ? SOLANA_RPC_ENDPOINTS[0] : network;
+
+    return new Connection(endpoint, {
       commitment: ConnectionCommitment.CONFIRMED,
       confirmTransactionInitialTimeout: 60000, // 60 seconds
       disableRetryOnRateLimit: false,
@@ -113,6 +121,42 @@ export class TransactionService {
    */
   public switchNetwork(network: SolanaNetwork): void {
     this.connection = createConnection(network);
+  }
+
+  /**
+   * Try different RPC endpoints for better reliability
+   */
+  private async tryWithFallbackEndpoints<T>(
+    operation: (connection: Connection) => Promise<T>,
+    maxRetries: number = 3
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < Math.min(maxRetries, SOLANA_RPC_ENDPOINTS.length); i++) {
+      try {
+        const endpoint = SOLANA_RPC_ENDPOINTS[i];
+        const connection = new Connection(endpoint, {
+          commitment: ConnectionCommitment.CONFIRMED,
+          confirmTransactionInitialTimeout: 30000, // 30 seconds
+          disableRetryOnRateLimit: false,
+          httpHeaders: {
+            'User-Agent': 'Neo-Payments-Wallet/1.0',
+          },
+        });
+
+        return await operation(connection);
+      } catch (error) {
+        lastError = error as Error;
+
+        // If this is the last attempt, don't wait
+        if (i < Math.min(maxRetries, SOLANA_RPC_ENDPOINTS.length) - 1) {
+          // Wait a bit before trying the next endpoint
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    throw lastError || new Error('All RPC endpoints failed');
   }
 
   /**
@@ -694,12 +738,14 @@ export class TransactionService {
   }
 
   /**
-   * Get account balance
+   * Get account balance with fallback endpoints
    */
   public async getBalance(address: PublicKey): Promise<number> {
     try {
-      const balance = await this.connection.getBalance(address);
-      return balance / LAMPORTS_PER_SOL;
+      return await this.tryWithFallbackEndpoints(async connection => {
+        const balance = await connection.getBalance(address);
+        return balance / LAMPORTS_PER_SOL;
+      });
     } catch (error) {
       console.error('Failed to get balance:', error);
       return 0;
