@@ -1,209 +1,271 @@
-import { View, StyleSheet, TouchableOpacity, FlatList, Modal } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { Typography } from './Typography';
-import { Contact } from './RecipientSelection';
-import {  TypographyVariant } from '../constants/enums';
-import { EDGE_MARGIN } from '../constants/styles';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { GradientBackground } from './GradientBackground';
+import { GradientCard } from './GradientCard';
+import { GradientType } from '../constants/enums';
+import { contactsService, Contact } from '../services/contactsService';
+import { useWalletStore } from '../store/walletStore';
 import CloseButton from './CloseButton';
 
 interface ContactSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  contacts: Contact[];
-  favorites: Contact[];
-  onContactSelect: (contact: Contact) => void;
-  onToggleFavorite: (contact: Contact) => void;
-  title: string;
+  onContactSelected: (contact: Contact) => void;
 }
 
-const ContactSelectionModal = ({
-  visible,
-  onClose,
-  contacts,
-  favorites,
-  onContactSelect,
-  onToggleFavorite,
-  title,
-}: ContactSelectionModalProps) => {
+export default function ContactSelectionModal({ 
+  visible, 
+  onClose, 
+  onContactSelected 
+}: ContactSelectionModalProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const { selectedWallet } = useWalletStore();
+  
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const renderContactItem = ({ item }: { item: Contact }) => (
+  // Load contacts when modal opens
+  useEffect(() => {
+    if (visible && selectedWallet) {
+      loadContacts();
+    }
+  }, [visible, selectedWallet]);
+
+  // Filter contacts based on search query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = contacts.filter(contact =>
+        contact.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        contact.contact_wallet_address.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredContacts(filtered);
+    } else {
+      setFilteredContacts(contacts);
+    }
+  }, [searchQuery, contacts]);
+
+  const loadContacts = async () => {
+    if (!selectedWallet) return;
+    
+    setIsLoading(true);
+    try {
+      const userContacts = await contactsService.getContacts(selectedWallet.publicKey);
+      setContacts(userContacts);
+      setFilteredContacts(userContacts);
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+      Alert.alert('Error', 'Failed to load contacts');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleContactSelect = (contact: Contact) => {
+    onContactSelected(contact);
+    onClose();
+  };
+
+  const formatAddress = (address: string) => {
+    if (address.length <= 12) return address;
+    return `${address.slice(0, 6)}...${address.slice(-6)}`;
+  };
+
+  const renderContact = ({ item }: { item: Contact }) => (
     <TouchableOpacity
-      style={styles.contactItem}
-      onPress={() => {
-        onContactSelect(item);
-        onClose();
-      }}
+      style={[styles.contactItem, { borderBottomColor: theme.text.LIGHT_GREY }]}
+      onPress={() => handleContactSelect(item)}
+      activeOpacity={0.7}
     >
       <View style={styles.contactInfo}>
-        <View style={styles.contactHeader}>
-          <Typography
-            variant={TypographyVariant.BODY_MEDIUM}
-            color={theme.text.SOFT_WHITE}
-            weight='600'
-          >
-            {item.name}
-          </Typography>
-          <TouchableOpacity onPress={() => onToggleFavorite(item)} style={styles.favoriteButton}>
-            <MaterialCommunityIcons
-              name={item.isFavorite ? 'heart' : 'heart-outline'}
-              size={20}
-              color={item.isFavorite ? theme.text.ERROR_RED : theme.text.LIGHT_GREY}
-            />
-          </TouchableOpacity>
+        <View style={[styles.avatar, { backgroundColor: theme.colors.ELECTRIC_BLUE }]}>
+          <Text style={styles.avatarText}>
+            {item.contact_name ? item.contact_name.charAt(0).toUpperCase() : '?'}
+          </Text>
         </View>
-        <Typography
-          variant={TypographyVariant.BODY_SMALL}
-          color={theme.text.LIGHT_GREY}
-          style={styles.contactAddress}
-        >
-          {item.address.slice(0, 8)}...{item.address.slice(-8)}
-        </Typography>
+        <View style={styles.contactDetails}>
+          <Text style={[styles.contactName, { color: theme.text.SOFT_WHITE }]}>
+            {item.contact_name || 'Unknown Contact'}
+          </Text>
+          <Text style={[styles.contactAddress, { color: theme.text.LIGHT_GREY }]}>
+            {formatAddress(item.contact_wallet_address)}
+          </Text>
+        </View>
       </View>
-      <MaterialCommunityIcons name='chevron-right' size={20} color={theme.text.LIGHT_GREY} />
+      <Text style={[styles.selectText, { color: theme.colors.ELECTRIC_BLUE }]}>
+        Select
+      </Text>
     </TouchableOpacity>
   );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <MaterialCommunityIcons name='account-outline' size={64} color={theme.text.LIGHT_GREY} />
-      <Typography
-        variant={TypographyVariant.TITLE_MEDIUM}
-        color={theme.text.LIGHT_GREY}
-        style={styles.emptyTitle}
-      >
-        No contacts found
-      </Typography>
-      <Typography
-        variant={TypographyVariant.BODY_MEDIUM}
-        color={theme.text.LIGHT_GREY}
-        style={styles.emptyText}
-      >
-        {title === 'Contacts'
-          ? "You don't have any contacts yet. Add some friends to make sending easier!"
-          : "You don't have any favorites yet. Mark contacts as favorites for quick access!"}
-      </Typography>
-    </View>
-  );
-
-  const dataToShow = title === 'Favorites' ? favorites : contacts;
 
   return (
     <Modal
       visible={visible}
-      animationType='slide'
-      presentationStyle='pageSheet'
+      animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <LinearGradient
-        colors={theme.gradients.PRIMARY.colors as [string, string, ...string[]]}
-        start={theme.gradients.PRIMARY.start}
-        end={theme.gradients.PRIMARY.end}
-        style={styles.container}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <CloseButton onPress={onClose} />
-          <Typography
-            variant={TypographyVariant.TITLE_LARGE}
-            color={theme.text.SOFT_WHITE}
-            weight='600'
-          >
-            {title}
-          </Typography>
-          <View style={styles.placeholder} />
-        </View>
+      <GradientBackground gradient={GradientType.PRIMARY} style={styles.container}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
+              Select Contact
+            </Text>
+            <CloseButton onPress={onClose} />
+          </View>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {dataToShow.length > 0 ? (
-            <FlatList
-              data={dataToShow}
-              renderItem={renderContactItem}
-              keyExtractor={item => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContainer}
+          <GradientCard style={styles.searchCard}>
+            <TextInput
+              style={[styles.searchInput, { 
+                color: theme.text.SOFT_WHITE,
+                borderColor: theme.text.LIGHT_GREY,
+              }]}
+              placeholder="Search contacts..."
+              placeholderTextColor={theme.text.LIGHT_GREY}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
-          ) : (
-            renderEmptyState()
-          )}
-        </View>
-      </LinearGradient>
+          </GradientCard>
+
+          <View style={styles.contactsContainer}>
+            {isLoading ? (
+              <GradientCard style={styles.loadingCard}>
+                <Text style={[styles.loadingText, { color: theme.text.LIGHT_GREY }]}>
+                  Loading contacts...
+                </Text>
+              </GradientCard>
+            ) : filteredContacts.length > 0 ? (
+              <FlatList
+                data={filteredContacts}
+                renderItem={renderContact}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                style={styles.contactsList}
+              />
+            ) : (
+              <GradientCard style={styles.emptyCard}>
+                <Text style={[styles.emptyText, { color: theme.text.LIGHT_GREY }]}>
+                  {searchQuery.trim() 
+                    ? 'No contacts found matching your search'
+                    : 'No contacts found. Add contacts to send payment requests.'
+                  }
+                </Text>
+              </GradientCard>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </GradientBackground>
     </Modal>
   );
-};
+}
 
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: EDGE_MARGIN,
-      paddingVertical: EDGE_MARGIN,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.background.SEMI_TRANSPARENT_WHITE,
-    },
-    placeholder: {
-      width: 40,
-    },
-    content: {
-      flex: 1,
-      paddingHorizontal: EDGE_MARGIN,
-    },
-    listContainer: {
-      paddingVertical: EDGE_MARGIN,
-    },
-    contactItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: theme.spacing.lg,
-      paddingHorizontal: theme.spacing.lg,
-      borderRadius: theme.borderRadius.medium,
-      backgroundColor: theme.background.SEMI_TRANSPARENT_WHITE,
-      marginBottom: theme.spacing.md,
-      borderWidth: 1,
-      borderColor: theme.background.SEMI_TRANSPARENT_WHITE,
-      ...theme.shadows.small,
-    },
-    contactInfo: {
-      flex: 1,
-    },
-    contactHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: theme.spacing.xs,
-    },
-    contactAddress: {
-      fontFamily: 'monospace',
-      fontSize: 14,
-    },
-    favoriteButton: {
-      padding: theme.spacing.xs,
-      borderRadius: theme.borderRadius.small,
-    },
-    emptyState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: EDGE_MARGIN * 2,
-    },
-    emptyTitle: {
-      marginTop: theme.spacing.lg,
-      marginBottom: theme.spacing.sm,
-    },
-    emptyText: {
-      textAlign: 'center',
-      lineHeight: 24,
-    },
-  });
-
-export default ContactSelectionModal;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  searchCard: {
+    margin: 20,
+    padding: 16,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  contactsContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  contactsList: {
+    flex: 1,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  contactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  contactDetails: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  contactAddress: {
+    fontSize: 14,
+  },
+  selectText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingCard: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});

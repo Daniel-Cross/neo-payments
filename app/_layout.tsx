@@ -71,6 +71,7 @@ function AppNavigator() {
       <Stack.Screen name="import-wallet" />
       <Stack.Screen name="receive-sol" />
       <Stack.Screen name="send" />
+      <Stack.Screen name="request" />
     </Stack>
   );
 }

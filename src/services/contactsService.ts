@@ -1,13 +1,25 @@
-import { Contact } from '../components/RecipientSelection';
+import { supabase } from './supabase';
+
+export interface Contact {
+  id: string;
+  user_wallet_address: string;
+  contact_wallet_address: string;
+  contact_name?: string;
+  contact_avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AddContactParams {
+  contact_wallet_address: string;
+  contact_name?: string;
+  contact_avatar_url?: string;
+}
 
 class ContactsService {
   private static instance: ContactsService;
-  private contacts: Contact[] = [];
-  private favorites: Contact[] = [];
 
-  private constructor() {
-    this.loadContacts();
-  }
+  private constructor() {}
 
   public static getInstance(): ContactsService {
     if (!ContactsService.instance) {
@@ -17,122 +29,265 @@ class ContactsService {
   }
 
   /**
-   * Get all contacts
+   * Set the current wallet address for RLS policies
    */
-  public getContacts(): Contact[] {
-    return this.contacts;
-  }
-
-  /**
-   * Get all favorites
-   */
-  public getFavorites(): Contact[] {
-    return this.favorites;
+  private async setCurrentWalletAddress(walletAddress: string): Promise<void> {
+    await supabase.rpc('set_config', {
+      setting_name: 'app.current_wallet_address',
+      new_value: walletAddress,
+      is_local: true,
+    });
   }
 
   /**
    * Add a new contact
    */
-  public addContact(name: string, address: string): Contact {
-    const newContact: Contact = {
-      id: Date.now().toString(),
-      name,
-      address,
-      isFavorite: false,
-    };
+  public async addContact(
+    user_wallet_address: string,
+    params: AddContactParams
+  ): Promise<{ success: boolean; contact?: Contact; error?: string }> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
 
-    this.contacts.push(newContact);
-    this.saveContacts();
-    return newContact;
+      // Prevent adding self as contact
+      if (user_wallet_address === params.contact_wallet_address) {
+        return {
+          success: false,
+          error: 'Cannot add yourself as a contact',
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .insert({
+          user_wallet_address,
+          contact_wallet_address: params.contact_wallet_address,
+          contact_name: params.contact_name,
+          contact_avatar_url: params.contact_avatar_url,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          // Unique constraint violation
+          return {
+            success: false,
+            error: 'Contact already exists',
+          };
+        }
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+
+      return {
+        success: true,
+        contact: data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add contact',
+      };
+    }
   }
 
   /**
-   * Toggle favorite status of a contact
+   * Get all contacts for a user
    */
-  public toggleFavorite(contact: Contact): Contact {
-    const updatedContact = { ...contact, isFavorite: !contact.isFavorite };
-    
-    // Update in contacts array
-    const contactIndex = this.contacts.findIndex(c => c.id === contact.id);
-    if (contactIndex !== -1) {
-      this.contacts[contactIndex] = updatedContact;
-    }
+  public async getContacts(user_wallet_address: string): Promise<Contact[]> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
 
-    // Update favorites array
-    if (updatedContact.isFavorite) {
-      // Add to favorites if not already there
-      const favoriteIndex = this.favorites.findIndex(f => f.id === contact.id);
-      if (favoriteIndex === -1) {
-        this.favorites.push(updatedContact);
-      } else {
-        this.favorites[favoriteIndex] = updatedContact;
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .select('*')
+        .eq('user_wallet_address', user_wallet_address)
+        .order('contact_name', { ascending: true });
+
+      if (error) {
+        console.error('Failed to get contacts:', error);
+        return [];
       }
-    } else {
-      // Remove from favorites
-      this.favorites = this.favorites.filter(f => f.id !== contact.id);
-    }
 
-    this.saveContacts();
-    return updatedContact;
+      return data || [];
+    } catch (error) {
+      console.error('Failed to get contacts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update a contact
+   */
+  public async updateContact(
+    user_wallet_address: string,
+    contact_wallet_address: string,
+    updates: Partial<AddContactParams>
+  ): Promise<{ success: boolean; contact?: Contact; error?: string }> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
+
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .update(updates)
+        .eq('user_wallet_address', user_wallet_address)
+        .eq('contact_wallet_address', contact_wallet_address)
+        .select()
+        .single();
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+
+      return {
+        success: true,
+        contact: data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update contact',
+      };
+    }
   }
 
   /**
    * Remove a contact
    */
-  public removeContact(contactId: string): void {
-    this.contacts = this.contacts.filter(c => c.id !== contactId);
-    this.favorites = this.favorites.filter(f => f.id !== contactId);
-    this.saveContacts();
+  public async removeContact(
+    user_wallet_address: string,
+    contact_wallet_address: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
+
+      const { error } = await supabase
+        .from('user_contacts')
+        .delete()
+        .eq('user_wallet_address', user_wallet_address)
+        .eq('contact_wallet_address', contact_wallet_address);
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to remove contact',
+      };
+    }
   }
 
   /**
-   * Find contact by address
+   * Check if a wallet address is in contacts
    */
-  public findContactByAddress(address: string): Contact | undefined {
-    return this.contacts.find(c => c.address === address);
+  public async isContact(
+    user_wallet_address: string,
+    contact_wallet_address: string
+  ): Promise<boolean> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
+
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .select('id')
+        .eq('user_wallet_address', user_wallet_address)
+        .eq('contact_wallet_address', contact_wallet_address)
+        .single();
+
+      return !error && !!data;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
-   * Load contacts from storage (mock implementation)
+   * Search contacts by name or wallet address
    */
-  private loadContacts(): void {
-    // In a real app, this would load from secure storage
-    // For now, we'll use some mock data
-    this.contacts = [
-      {
-        id: '1',
-        name: 'Alice Johnson',
-        address: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
-        isFavorite: true,
-      },
-      {
-        id: '2',
-        name: 'Bob Smith',
-        address: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1',
-        isFavorite: false,
-      },
-      {
-        id: '3',
-        name: 'Charlie Brown',
-        address: '3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyCQdKjxX7es',
-        isFavorite: true,
-      },
-    ];
+  public async searchContacts(user_wallet_address: string, query: string): Promise<Contact[]> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
 
-    // Initialize favorites from contacts
-    this.favorites = this.contacts.filter(c => c.isFavorite);
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .select('*')
+        .eq('user_wallet_address', user_wallet_address)
+        .or(`contact_name.ilike.%${query}%,contact_wallet_address.ilike.%${query}%`)
+        .order('contact_name', { ascending: true });
+
+      if (error) {
+        console.error('Failed to search contacts:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to search contacts:', error);
+      return [];
+    }
   }
 
   /**
-   * Save contacts to storage (mock implementation)
+   * Get contact by wallet address
    */
-  private saveContacts(): void {
-    // In a real app, this would save to secure storage
-    console.log('Contacts saved:', this.contacts);
-    console.log('Favorites saved:', this.favorites);
+  public async getContactByAddress(
+    user_wallet_address: string,
+    contact_wallet_address: string
+  ): Promise<Contact | null> {
+    try {
+      await this.setCurrentWalletAddress(user_wallet_address);
+
+      const { data, error } = await supabase
+        .from('user_contacts')
+        .select('*')
+        .eq('user_wallet_address', user_wallet_address)
+        .eq('contact_wallet_address', contact_wallet_address)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Failed to get contact:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to real-time contact updates
+   */
+  public subscribeToContacts(user_wallet_address: string, callback: (contact: Contact) => void) {
+    return supabase
+      .channel('user_contacts')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_contacts',
+          filter: `user_wallet_address.eq.${user_wallet_address}`,
+        },
+        payload => {
+          if (payload.new) {
+            callback(payload.new as Contact);
+          }
+        }
+      )
+      .subscribe();
   }
 }
 
-// Export singleton instance
 export const contactsService = ContactsService.getInstance();
-export default contactsService;

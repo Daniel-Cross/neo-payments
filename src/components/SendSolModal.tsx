@@ -29,13 +29,15 @@ import ToggleButtonGroup from './ToggleButtonGroup';
 import NetworkStatus from './NetworkStatus';
 import TransactionSummary from './TransactionSummary';
 import PrivacyNotice from './PrivacyNotice';
-import RecipientSelection, { Contact } from './RecipientSelection';
+import RecipientSelection, { Contact as RecipientContact } from './RecipientSelection';
+import { Contact as SupabaseContact } from '../services/contactsService';
 import CloseButton from './CloseButton';
 import QRScanner from './QRScanner';
 
 // Services
 import { transactionService, TransferParams } from '../services/transactionService';
 import { contactsService } from '../services/contactsService';
+import { calculateTotalCost } from '../utils/walletHelpers';
 
 // Constants and Utils
 import {
@@ -94,8 +96,8 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   // Form state
   const [formState, setFormState] = useState(resetFormState());
   const [isLoading, setIsLoading] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [favorites, setFavorites] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<RecipientContact[]>([]);
+  const [favorites, setFavorites] = useState<RecipientContact[]>([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Destructure form state for easier access
@@ -114,14 +116,33 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     selectedRecipientType,
   } = formState;
 
+  // Map Supabase contacts to RecipientContact format
+  const mapSupabaseToRecipientContact = (supabaseContact: SupabaseContact): RecipientContact => ({
+    id: supabaseContact.id,
+    name: supabaseContact.contact_name || 'Unknown Contact',
+    address: supabaseContact.contact_wallet_address,
+    isFavorite: false, // We'll implement favorites later
+  });
+
   // Load contacts and favorites on mount
   useEffect(() => {
-    const loadContacts = () => {
-      setContacts(contactsService.getContacts());
-      setFavorites(contactsService.getFavorites());
+    const loadContacts = async () => {
+      if (selectedWallet) {
+        try {
+          const userContacts = await contactsService.getContacts(selectedWallet.publicKey);
+          const mappedContacts = userContacts.map(mapSupabaseToRecipientContact);
+          setContacts(mappedContacts);
+          // For now, we'll use an empty favorites array since the new service doesn't have favorites
+          setFavorites([]);
+        } catch (error) {
+          console.error('Failed to load contacts:', error);
+          setContacts([]);
+          setFavorites([]);
+        }
+      }
     };
     loadContacts();
-  }, []);
+  }, [selectedWallet]);
 
   // Reset form when modal opens or set initial values if provided
   useEffect(() => {
@@ -392,7 +413,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   };
 
   // Contact handlers
-  const handleContactSelect = (contact: Contact) => {
+  const handleContactSelect = (contact: RecipientContact) => {
     setFormState(prev => ({ 
       ...prev, 
       recipientAddress: contact.address,
@@ -400,10 +421,10 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     }));
   };
 
-  const handleToggleFavorite = (contact: Contact) => {
-    contactsService.toggleFavorite(contact);
-    setContacts(contactsService.getContacts());
-    setFavorites(contactsService.getFavorites());
+  const handleToggleFavorite = async (_contact: RecipientContact) => {
+    // For now, we'll disable favorites functionality since the new service doesn't support it
+    // This could be implemented later by adding a favorites field to the contacts table
+    console.log('Favorites functionality not yet implemented in Supabase service');
   };
 
   // Calculate current values safely using useMemo to prevent render issues
@@ -411,6 +432,16 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     inputMode === InputMode.CURRENCY ? currencyAmount : amount, 
     [inputMode, currencyAmount, amount]
   );
+
+  // Calculate fee information
+  const feeCalculation = useMemo(() => {
+    const amountNum = parseFloat(currentAmount);
+    if (amountNum > 0) {
+      const networkFee = optimalFee?.feeInSOL || 0.000005;
+      return calculateTotalCost(amountNum, networkFee);
+    }
+    return null;
+  }, [currentAmount, optimalFee]);
   
   const numAmount = useMemo(() => 
     parseFloat(currentAmount) || 0, 
@@ -627,6 +658,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
                   totalCost={totalCost}
                   balance={balance}
                   solToCurrency={solToCurrency}
+                  platformFee={feeCalculation?.feeAmount || 0}
                 />
               )}
               {/* Network Status */}

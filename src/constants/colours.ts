@@ -15,6 +15,7 @@ export const BACKGROUND = {
   PURPLE_HOVER: '#8B00CB', // Hover states
   OVERLAY: 'rgba(0, 0, 0, 0.5)',
   SEMI_TRANSPARENT_WHITE: 'rgba(255, 255, 255, 0.05)', // Subtle white overlay for cards/inputs
+  INPUT: '#4C006B', // Input field background
 };
 
 // Text colors

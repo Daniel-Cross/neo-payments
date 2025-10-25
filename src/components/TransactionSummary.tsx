@@ -12,6 +12,7 @@ interface TransactionSummaryProps {
   totalCost: number;
   balance: number;
   solToCurrency: (sol: number) => number;
+  platformFee?: number; // Platform fee in SOL
   style?: any;
 }
 
@@ -24,6 +25,7 @@ const TransactionSummary = ({
   totalCost,
   balance,
   solToCurrency,
+  platformFee = 0,
   style,
 }: TransactionSummaryProps) => {
   const { theme } = useTheme();
@@ -58,6 +60,23 @@ const TransactionSummary = ({
           }
         </Typography>
       </View>
+      
+      {platformFee > 0 && (
+        <View style={styles.summaryRow}>
+          <Typography 
+            variant={TypographyVariant.BODY_MEDIUM}
+            color={theme.text.LIGHT_GREY}
+          >
+            Platform Fee:
+          </Typography>
+          <Typography 
+            variant={TypographyVariant.BODY_MEDIUM}
+            color={theme.text.SOFT_WHITE}
+          >
+            {platformFee.toFixed(6)} SOL ({solToCurrency(platformFee).toFixed(2)} {selectedCurrency})
+          </Typography>
+        </View>
+      )}
       
       <View style={styles.summaryRow}>
         <Typography 

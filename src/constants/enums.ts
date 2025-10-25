@@ -279,5 +279,17 @@ export enum RecipientSelectionText {
 export enum DeepLinkType {
   SEND = 'send',
   RECEIVE = 'receive',
+  REQUEST = 'request',
   UNKNOWN = 'unknown',
+}
+
+export enum RequestStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  EXPIRED = 'expired',
+}
+
+export enum RequestType {
+  PAYMENT_REQUEST = 'payment_request',
 }

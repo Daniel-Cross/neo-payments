@@ -7,6 +7,11 @@ import {
   NetworkCongestion,
   SOLANA_RPC_ENDPOINTS,
 } from '../constants/enums';
+import {
+  calculateTotalCost,
+  getFeeWalletAddress,
+  isFeeWalletConfigured,
+} from '../utils/walletHelpers';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
 import { encodeBase64, decodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
@@ -72,6 +77,7 @@ export interface TransferParams {
   to: PublicKey;
   amount: number; // in SOL (will be converted to lamports)
   memo?: string;
+  includePlatformFee?: boolean; // Whether to include platform fee (default: true)
 }
 
 export interface TransactionResult {
@@ -137,7 +143,7 @@ export class TransactionService {
         const endpoint = SOLANA_RPC_ENDPOINTS[i];
         const connection = new Connection(endpoint, {
           commitment: ConnectionCommitment.CONFIRMED,
-          confirmTransactionInitialTimeout: 30000, // 30 seconds
+          confirmTransactionInitialTimeout: 60000,
           disableRetryOnRateLimit: false,
           httpHeaders: {
             'User-Agent': 'Neo-Payments-Wallet/1.0',
@@ -150,7 +156,7 @@ export class TransactionService {
 
         // If this is the last attempt, don't wait
         if (i < Math.min(maxRetries, SOLANA_RPC_ENDPOINTS.length) - 1) {
-          // Wait a bit before trying the next endpoint
+          // Simple delay between endpoint attempts
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
@@ -436,22 +442,29 @@ export class TransactionService {
   }
 
   /**
-   * Get transaction history for an address
+   * Get transaction history for an address with fallback endpoints
    */
   public async getTransactionHistory(
     address: PublicKey,
-    limit: number = 20
+    limit: number = 10
   ): Promise<TransactionDetails[]> {
     try {
-      const signatures = await this.connection.getSignaturesForAddress(address, { limit });
+      return await this.tryWithFallbackEndpoints(async connection => {
+        const signatures = await connection.getSignaturesForAddress(address, { limit });
+        const transactions: TransactionDetails[] = [];
 
-      const transactions: TransactionDetails[] = [];
+        // Extract signature strings for batch fetching
+        const signatureStrings = signatures.map(sig => sig.signature);
 
-      for (const sigInfo of signatures) {
-        try {
-          const tx = await this.connection.getTransaction(sigInfo.signature, {
-            maxSupportedTransactionVersion: 0,
-          });
+        // Fetch all transactions in a single batch call (more efficient)
+        const txs = await connection.getTransactions(signatureStrings, {
+          maxSupportedTransactionVersion: 0,
+        });
+
+        // Process the batch results
+        for (let i = 0; i < signatures.length; i++) {
+          const sigInfo = signatures[i];
+          const tx = txs[i]; // Get corresponding transaction
 
           if (tx && tx.meta) {
             // Parse transaction details
@@ -479,8 +492,8 @@ export class TransactionService {
                 // Versioned transaction - convert to array
                 const accountKeysResult = message.getAccountKeys();
                 accountKeys = [];
-                for (let i = 0; i < accountKeysResult.length; i++) {
-                  const key = accountKeysResult.get(i);
+                for (let j = 0; j < accountKeysResult.length; j++) {
+                  const key = accountKeysResult.get(j);
                   if (key) {
                     accountKeys.push(key);
                   }
@@ -503,9 +516,20 @@ export class TransactionService {
                   if (log.includes('Program log: ')) {
                     const memoMatch = log.match(/Program log: (.+)/);
                     if (memoMatch && memoMatch[1]) {
-                      // Store the raw memo (might be encrypted)
-                      // Decryption will be done when displaying if user has the keypair
-                      transactionDetails.memo = memoMatch[1];
+                      const rawMemo = memoMatch[1];
+                      // Try to decode the memo (it might be base64 encoded)
+                      try {
+                        // Check if it's base64 encoded
+                        if (this.isBase64(rawMemo)) {
+                          const decoded = Buffer.from(rawMemo, 'base64').toString('utf-8');
+                          transactionDetails.memo = decoded;
+                        } else {
+                          transactionDetails.memo = rawMemo;
+                        }
+                      } catch (decodeError) {
+                        // If decoding fails, use raw memo
+                        transactionDetails.memo = rawMemo;
+                      }
                       break;
                     }
                   }
@@ -517,12 +541,10 @@ export class TransactionService {
 
             transactions.push(transactionDetails);
           }
-        } catch (error) {
-          console.warn(`Failed to fetch transaction ${sigInfo.signature}:`, error);
         }
-      }
 
-      return transactions;
+        return transactions;
+      });
     } catch (error) {
       console.error('Failed to get transaction history:', error);
       return [];
@@ -530,18 +552,31 @@ export class TransactionService {
   }
 
   /**
-   * Get current network fee rate
+   * Helper method to check if a string is base64 encoded
+   */
+  private isBase64(str: string): boolean {
+    try {
+      return btoa(atob(str)) === str;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * Get current network fee rate with fallback endpoints
    */
   public async getCurrentFeeRate(): Promise<number> {
     try {
-      const recentFees = await this.connection.getRecentPrioritizationFees();
-      if (recentFees.length > 0) {
-        // Return median fee rate
-        const sortedFees = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
-        const median = sortedFees[Math.floor(sortedFees.length / 2)];
-        return median;
-      }
-      return 0;
+      return await this.tryWithFallbackEndpoints(async connection => {
+        const recentFees = await connection.getRecentPrioritizationFees();
+        if (recentFees.length > 0) {
+          // Return median fee rate
+          const sortedFees = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
+          const median = sortedFees[Math.floor(sortedFees.length / 2)];
+          return median;
+        }
+        return 0;
+      });
     } catch (error) {
       console.warn('Failed to get current fee rate:', error);
       return 0;
@@ -549,7 +584,7 @@ export class TransactionService {
   }
 
   /**
-   * Get optimal fee for best price-to-performance ratio
+   * Get optimal fee for best price-to-performance ratio with fallback endpoints
    */
   public async getOptimalFee(): Promise<{
     baseFee: number;
@@ -561,45 +596,47 @@ export class TransactionService {
     lastUpdated: number;
   }> {
     try {
-      const recentFees = await this.connection.getRecentPrioritizationFees();
-      const baseFee = 5000; // Base transaction fee in lamports
+      return await this.tryWithFallbackEndpoints(async connection => {
+        const recentFees = await connection.getRecentPrioritizationFees();
+        const baseFee = 5000; // Base transaction fee in lamports
 
-      let priorityFee = 1000; // Default minimum
-      let networkCongestion: NetworkCongestion = NetworkCongestion.LOW;
-      let estimatedTime = '5-15 seconds';
+        let priorityFee = 1000; // Default minimum
+        let networkCongestion: NetworkCongestion = NetworkCongestion.LOW;
+        let estimatedTime = '5-15 seconds';
 
-      if (recentFees.length > 0) {
-        const sortedFees = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
-        const p50 = sortedFees[Math.floor(sortedFees.length * 0.5)];
-        const p75 = sortedFees[Math.floor(sortedFees.length * 0.75)];
+        if (recentFees.length > 0) {
+          const sortedFees = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
+          const p50 = sortedFees[Math.floor(sortedFees.length * 0.5)];
+          const p75 = sortedFees[Math.floor(sortedFees.length * 0.75)];
 
-        // Determine network congestion
-        if (p75 > 50000) {
-          networkCongestion = NetworkCongestion.HIGH;
-          estimatedTime = '10-20 seconds';
-        } else if (p50 > 10000) {
-          networkCongestion = NetworkCongestion.MEDIUM;
-          estimatedTime = '5-15 seconds';
-        } else {
-          estimatedTime = '3-8 seconds';
+          // Determine network congestion
+          if (p75 > 50000) {
+            networkCongestion = NetworkCongestion.HIGH;
+            estimatedTime = '10-20 seconds';
+          } else if (p50 > 10000) {
+            networkCongestion = NetworkCongestion.MEDIUM;
+            estimatedTime = '5-15 seconds';
+          } else {
+            estimatedTime = '3-8 seconds';
+          }
+
+          // Use P50 for optimal price-to-performance ratio
+          // This gives good confirmation speed without overpaying
+          priorityFee = Math.max(1000, p50);
         }
 
-        // Use P50 for optimal price-to-performance ratio
-        // This gives good confirmation speed without overpaying
-        priorityFee = Math.max(1000, p50);
-      }
+        const totalFee = baseFee + priorityFee;
 
-      const totalFee = baseFee + priorityFee;
-
-      return {
-        baseFee,
-        priorityFee,
-        totalFee,
-        feeInSOL: totalFee / LAMPORTS_PER_SOL,
-        networkCongestion,
-        estimatedTime,
-        lastUpdated: Date.now(),
-      };
+        return {
+          baseFee,
+          priorityFee,
+          totalFee,
+          feeInSOL: totalFee / LAMPORTS_PER_SOL,
+          networkCongestion,
+          estimatedTime,
+          lastUpdated: Date.now(),
+        };
+      });
     } catch (error) {
       console.warn('Optimal fee calculation failed, using defaults:', error);
 
@@ -750,6 +787,91 @@ export class TransactionService {
       console.error('Failed to get balance:', error);
       return 0;
     }
+  }
+
+  /**
+   * Send SOL with optional platform fee
+   */
+  public async sendSol(
+    params: TransferParams,
+    senderKeypair: Keypair,
+    networkFee: number = 0.000005 // Default Solana network fee
+  ): Promise<TransactionResult> {
+    try {
+      const { from, to, amount, memo, includePlatformFee = true } = params;
+
+      // Calculate total cost including platform fee
+      const feeCalculation = calculateTotalCost(amount, networkFee);
+
+      // Check if fee wallet is configured
+      if (includePlatformFee && !isFeeWalletConfigured()) {
+        throw new Error('Platform fee wallet not configured. Please contact support.');
+      }
+
+      // Create the main transfer transaction
+      const mainTransferParams: TransferParams = {
+        from,
+        to,
+        amount,
+        memo,
+        includePlatformFee: false, // Don't include fee in the main transfer
+      };
+
+      const mainTransaction = await this.createVersionedTransferTransaction(mainTransferParams);
+      const signedMainTransaction = this.signTransaction(mainTransaction, senderKeypair);
+
+      // Send the main transaction
+      const mainResult = await this.sendTransaction(signedMainTransaction);
+
+      if (!mainResult.success) {
+        return mainResult;
+      }
+
+      // If platform fee is enabled and fee wallet is configured, send the fee
+      if (includePlatformFee && feeCalculation.feeAmount > 0) {
+        try {
+          const feeWalletAddress = new PublicKey(getFeeWalletAddress());
+
+          const feeTransferParams: TransferParams = {
+            from,
+            to: feeWalletAddress,
+            amount: feeCalculation.feeAmount,
+            memo: `Platform fee for ${amount} SOL transfer`,
+            includePlatformFee: false, // Don't charge fee on the fee itself
+          };
+
+          const feeTransaction = await this.createVersionedTransferTransaction(feeTransferParams);
+          const signedFeeTransaction = this.signTransaction(feeTransaction, senderKeypair);
+
+          const feeResult = await this.sendTransaction(signedFeeTransaction);
+
+          if (!feeResult.success) {
+            console.warn('Main transaction succeeded but fee transaction failed:', feeResult.error);
+            // Main transaction succeeded, so we return success but log the fee issue
+          }
+        } catch (feeError) {
+          console.warn('Failed to send platform fee:', feeError);
+          // Main transaction succeeded, so we return success but log the fee issue
+        }
+      }
+
+      return mainResult;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send SOL',
+      };
+    }
+  }
+
+  /**
+   * Calculate fee for a transaction without sending it
+   */
+  public calculateTransactionFee(
+    amount: number,
+    networkFee: number = 0.000005
+  ): ReturnType<typeof calculateTotalCost> {
+    return calculateTotalCost(amount, networkFee);
   }
 }
 

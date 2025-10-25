@@ -1,46 +1,110 @@
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from "react-native";
+import { useState, useEffect } from "react";
 import { useTheme } from "../contexts/ThemeContext";
+import { useWalletStore } from "../store/walletStore";
 import { GradientBackground } from "../components/GradientBackground";
 import { GradientCard } from "../components/GradientCard";
 import { GradientType } from "../constants/enums";
+import { TransactionDetails, transactionService } from "../services/transactionService";
 
 const HistoryScreen = () => {
   const { theme } = useTheme();
+  const { selectedWallet, getTransactionHistory, publicKey } = useWalletStore();
+  
+  const [transactions, setTransactions] = useState<TransactionDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [decryptedMemos, setDecryptedMemos] = useState<Map<string, string>>(new Map());
 
-  // Mock transaction history data
-  const transactions = [
-    {
-      id: "1",
-      type: "sent",
-      amount: "2.5 SOL",
-      to: "Alice",
-      date: "2024-01-15",
-      status: "confirmed",
-    },
-    {
-      id: "2",
-      type: "received",
-      amount: "1.0 SOL",
-      from: "Bob",
-      date: "2024-01-14",
-      status: "confirmed",
-    },
-    {
-      id: "3",
-      type: "sent",
-      amount: "0.5 SOL",
-      to: "Charlie",
-      date: "2024-01-13",
-      status: "pending",
-    },
-  ];
+  // Load transaction history when component mounts or wallet changes
+  useEffect(() => {
+    if (selectedWallet && publicKey) {
+      loadTransactionHistory();
+    } else {
+      setTransactions([]);
+      setDecryptedMemos(new Map());
+    }
+  }, [selectedWallet, publicKey]);
 
-  const getTransactionIcon = (type: string) => {
+  // Decrypt memos when transactions are loaded
+  useEffect(() => {
+    const decryptMemos = async () => {
+      if (transactions.length === 0 || !selectedWallet) {
+        setDecryptedMemos(new Map());
+        return;
+      }
+
+      const memos = new Map<string, string>();
+
+      for (const tx of transactions) {
+        if (tx.memo) {
+          try {
+            const result = await transactionService.tryDecryptMemo(tx.memo, selectedWallet.keypair);
+            memos.set(tx.signature, result.text);
+          } catch (error) {
+            console.warn(`Failed to decrypt memo for transaction ${tx.signature}:`, error);
+            memos.set(tx.signature, tx.memo); // Fallback to raw memo
+          }
+        }
+      }
+
+      setDecryptedMemos(memos);
+    };
+
+    decryptMemos();
+  }, [transactions, selectedWallet]);
+
+  const loadTransactionHistory = async () => {
+    if (!selectedWallet) return;
+    
+    setIsLoading(true);
+    try {
+      // Load a smaller number of transactions initially to avoid rate limiting
+      const history = await getTransactionHistory();
+      setTransactions(history);
+    } catch (error) {
+      console.error('Failed to load transaction history:', error);
+      // Don't show error to user, just log it and show empty state
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadTransactionHistory();
+    setIsRefreshing(false);
+  };
+
+  // Helper functions to determine transaction type and styling
+  const getTransactionType = (transaction: TransactionDetails) => {
+    if (!selectedWallet) return 'unknown';
+    return transaction.from === selectedWallet.publicKey ? 'sent' : 'received';
+  };
+
+  const getTransactionIcon = (transaction: TransactionDetails) => {
+    const type = getTransactionType(transaction);
     return type === "sent" ? "↓" : "↑";
   };
 
-  const getTransactionColor = (type: string) => {
+  const getTransactionColor = (transaction: TransactionDetails) => {
+    const type = getTransactionType(transaction);
     return type === "sent" ? theme.text.ERROR_RED : theme.text.SUCCESS_GREEN;
+  };
+
+  const formatAmount = (amount: number) => {
+    return `${amount.toFixed(4)} SOL`;
+  };
+
+  const formatDate = (blockTime: number) => {
+    if (!blockTime) return 'Unknown';
+    const date = new Date(blockTime * 1000);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatAddress = (address: string) => {
+    if (!address) return 'Unknown';
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
   return (
@@ -53,92 +117,121 @@ const HistoryScreen = () => {
           Transaction History
         </Text>
         <Text style={[styles.subtitle, { color: theme.text.LIGHT_GREY }]}>
-          View all your Solana transactions
+          {selectedWallet ? `${selectedWallet.name} - ${formatAddress(selectedWallet.publicKey)}` : 'No wallet selected'}
         </Text>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.text.SOFT_WHITE}
+          />
+        }
       >
-        {transactions.length > 0 ? (
-          transactions.map((transaction) => (
-            <GradientCard key={transaction.id} style={styles.transactionCard}>
-              <View style={styles.transactionHeader}>
-                <View style={styles.transactionInfo}>
-                  <Text
-                    style={[
-                      styles.transactionIcon,
-                      { color: getTransactionColor(transaction.type) },
-                    ]}
-                  >
-                    {getTransactionIcon(transaction.type)}
-                  </Text>
-                  <View style={styles.transactionDetails}>
+            {isLoading ? (
+              <GradientCard style={styles.loadingCard}>
+                <ActivityIndicator size="large" color={theme.text.SOFT_WHITE} />
+                <Text style={[styles.loadingText, { color: theme.text.LIGHT_GREY }]}>
+                  Loading transactions...
+                </Text>
+                <Text style={[styles.loadingSubtext, { color: theme.text.LIGHT_GREY }]}>
+                  Fetching transaction history
+                </Text>
+              </GradientCard>
+        ) : transactions.length > 0 ? (
+          transactions.map((transaction) => {
+            const type = getTransactionType(transaction);
+            return (
+              <GradientCard key={transaction.signature} style={styles.transactionCard}>
+                <View style={styles.transactionHeader}>
+                  <View style={styles.transactionInfo}>
                     <Text
                       style={[
-                        styles.transactionType,
-                        { color: theme.text.SOFT_WHITE },
+                        styles.transactionIcon,
+                        { color: getTransactionColor(transaction) },
                       ]}
                     >
-                      {transaction.type === "sent"
-                        ? "Sent to"
-                        : "Received from"}
+                      {getTransactionIcon(transaction)}
                     </Text>
+                    <View style={styles.transactionDetails}>
+                      <Text
+                        style={[
+                          styles.transactionType,
+                          { color: theme.text.SOFT_WHITE },
+                        ]}
+                      >
+                        {type === "sent" ? "Sent to" : "Received from"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.transactionAddress,
+                          { color: theme.text.LIGHT_GREY },
+                        ]}
+                      >
+                        {type === "sent" ? formatAddress(transaction.to) : formatAddress(transaction.from)}
+                      </Text>
+                      {decryptedMemos.get(transaction.signature) && (
+                        <Text
+                          style={[
+                            styles.memo,
+                            { color: theme.text.LIGHT_GREY },
+                          ]}
+                        >
+                          "{decryptedMemos.get(transaction.signature)}"
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.transactionAmount}>
                     <Text
                       style={[
-                        styles.transactionAddress,
-                        { color: theme.text.LIGHT_GREY },
+                        styles.amount,
+                        { color: getTransactionColor(transaction) },
                       ]}
                     >
-                      {transaction.type === "sent"
-                        ? transaction.to
-                        : transaction.from}
+                      {type === "sent" ? "-" : "+"}
+                      {formatAmount(transaction.amount)}
+                    </Text>
+                    <Text style={[styles.date, { color: theme.text.LIGHT_GREY }]}>
+                      {formatDate(transaction.blockTime)}
                     </Text>
                   </View>
                 </View>
-                <View style={styles.transactionAmount}>
-                  <Text
+
+                <View style={styles.transactionFooter}>
+                  <View
                     style={[
-                      styles.amount,
-                      { color: getTransactionColor(transaction.type) },
+                      styles.statusBadge,
+                      {
+                        backgroundColor:
+                          transaction.status === "success"
+                            ? theme.text.SUCCESS_GREEN
+                            : theme.text.ERROR_RED,
+                      },
                     ]}
                   >
-                    {transaction.type === "sent" ? "-" : "+"}
-                    {transaction.amount}
-                  </Text>
-                  <Text style={[styles.date, { color: theme.text.LIGHT_GREY }]}>
-                    {transaction.date}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.transactionFooter}>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor:
-                        transaction.status === "confirmed"
-                          ? theme.text.SUCCESS_GREEN
-                          : theme.text.WARNING_ORANGE,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.statusText, { color: "#000" }]}>
-                    {transaction.status}
+                    <Text style={[styles.statusText, { color: "#000" }]}>
+                      {transaction.status}
+                    </Text>
+                  </View>
+                  <Text style={[styles.feeText, { color: theme.text.LIGHT_GREY }]}>
+                    Fee: {(transaction.fee / 1000000000).toFixed(6)} SOL
                   </Text>
                 </View>
-              </View>
-            </GradientCard>
-          ))
-        ) : (
-          <GradientCard style={styles.emptyCard}>
-            <Text style={[styles.emptyText, { color: theme.text.LIGHT_GREY }]}>
-              No transactions yet
-            </Text>
-          </GradientCard>
-        )}
+              </GradientCard>
+            );
+          })
+            ) : (
+              <GradientCard style={styles.emptyCard}>
+                <Text style={[styles.emptyText, { color: theme.text.LIGHT_GREY }]}>
+                  {selectedWallet ? 'No transactions found' : 'Please select a wallet to view transaction history'}
+                </Text>
+              </GradientCard>
+            )}
       </ScrollView>
     </GradientBackground>
   );
@@ -222,9 +315,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 40,
   },
-  emptyText: {
-    fontSize: 16,
-    textAlign: "center",
+      emptyText: {
+        fontSize: 16,
+        textAlign: "center",
+      },
+      emptySubtext: {
+        fontSize: 12,
+        textAlign: "center",
+        marginTop: 8,
+        fontStyle: "italic",
+      },
+  loadingCard: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 16,
+  },
+      loadingText: {
+        fontSize: 16,
+        textAlign: "center",
+      },
+      loadingSubtext: {
+        fontSize: 12,
+        textAlign: "center",
+        marginTop: 4,
+      },
+  memo: {
+    fontSize: 12,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  feeText: {
+    fontSize: 10,
+    marginLeft: 8,
   },
 });
 

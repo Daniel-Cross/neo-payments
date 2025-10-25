@@ -52,6 +52,9 @@ export default {
       eas: {
         projectId: "ce6d91f4-c1ae-4e40-ad45-b187b5ec5d6f",
       },
+      // Fee Configuration
+      // TODO: Replace with your actual Solana wallet address that will receive transaction fees
+      feeWalletAddress: "FEE_WALLET_ADDRESS_PLACEHOLDER",
     },
     plugins: [
       "expo-build-properties",

@@ -36,6 +36,9 @@ export function useDeepLink() {
           } else if (parsedData.type === 'receive') {
             // For receive links, just navigate to home (QR code display)
             router.push('/(tabs)');
+          } else if (parsedData.type === 'request' && parsedData.requestId) {
+            // Navigate to request screen
+            router.push(`/request?requestId=${parsedData.requestId}`);
           }
 
           setDeepLinkState({
@@ -70,6 +73,9 @@ export function useDeepLink() {
         } else if (parsedData.type === 'receive') {
           // For receive links, just navigate to home (QR code display)
           router.push('/(tabs)');
+        } else if (parsedData.type === 'request' && parsedData.requestId) {
+          // Navigate to request screen
+          router.push(`/request?requestId=${parsedData.requestId}`);
         }
 
         setDeepLinkState({

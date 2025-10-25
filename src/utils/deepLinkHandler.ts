@@ -6,6 +6,7 @@ export interface DeepLinkData {
   walletAddress?: string;
   amount?: string;
   memo?: string;
+  requestId?: string;
 }
 
 /**
@@ -13,8 +14,10 @@ export interface DeepLinkData {
  * Supported formats:
  * - neo://send?address=WALLET_ADDRESS&amount=1.5&memo=Hello
  * - neo://receive?address=WALLET_ADDRESS
+ * - neo://request?requestId=REQUEST_ID
  * - https://neo.app/send?address=WALLET_ADDRESS&amount=1.5&memo=Hello
  * - https://neo.app/receive?address=WALLET_ADDRESS
+ * - https://neo.app/request?requestId=REQUEST_ID
  *
  * Note: Send deep links now navigate to /send route instead of opening modal
  */
@@ -42,6 +45,13 @@ export function parseDeepLink(url: string): DeepLinkData {
       return {
         type: DeepLinkType.RECEIVE,
         walletAddress: params.address as string,
+      };
+    }
+
+    if (path === 'request') {
+      return {
+        type: DeepLinkType.REQUEST,
+        requestId: params.requestId as string,
       };
     }
 
@@ -81,6 +91,13 @@ export function generateSendDeepLink(
  */
 export function generateReceiveDeepLink(walletAddress: string): string {
   return `neo://receive?address=${encodeURIComponent(walletAddress)}`;
+}
+
+/**
+ * Generates a deep link URL for payment requests
+ */
+export function generateRequestDeepLink(requestId: string): string {
+  return `neo://request?requestId=${encodeURIComponent(requestId)}`;
 }
 
 /**
