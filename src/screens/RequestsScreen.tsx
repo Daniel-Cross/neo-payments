@@ -128,16 +128,10 @@ const RequestsScreen = () => {
 
       {/* Create Request Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.createRequestButton, { backgroundColor: theme.colors.ELECTRIC_BLUE }]}
-          onPress={() => setShowCreateModal(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.createRequestIcon}>💸</Text>
-          <Text style={[styles.createRequestText, { color: theme.text.SOFT_WHITE }]}>
-            Request Payment
-          </Text>
-        </TouchableOpacity>
+        <GradientButton 
+        title="💸 Request Payment"
+        onPress={() => setShowCreateModal(true)}
+        />
       </View>
 
       <ScrollView

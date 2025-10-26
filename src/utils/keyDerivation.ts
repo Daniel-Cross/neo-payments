@@ -133,10 +133,14 @@ export const deriveKeypairFromSeedPhrase = async (
 
     // 2. Correct Solana derivation path (Phantom format)
     const derivationPath = `m/44'/501'/${accountIndex}'/0'`;
+
     // 3. ✅ SLIP-0010 ed25519 derivation (correct for Solana)
     const derivedPrivKey = deriveEd25519Key(seed, derivationPath);
+
     // 4. Solana keypair from derived seed
-    return Keypair.fromSeed(Buffer.from(derivedPrivKey));
+    const keypair = Keypair.fromSeed(Buffer.from(derivedPrivKey));
+
+    return keypair;
   } catch (error) {
     throw new Error(
       `Failed to derive keypair from seed phrase: ${

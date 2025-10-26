@@ -4,7 +4,9 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
+import { useEffect, useState } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { Typography } from "./Typography";
 import { TypographyVariant, ButtonVariant } from "../constants/enums";
@@ -12,6 +14,7 @@ import { GradientButton } from "./GradientButton";
 import { EDGE_MARGIN } from "../constants/styles";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useWalletManagement } from "../hooks/useWalletManagement";
+import { useWalletStore } from "../store/walletStore";
 import WalletItem from "./WalletItem";
 import CurrentWalletSection from "./CurrentWalletSection";
 import ImportWalletModal from "./ImportWalletModal";
@@ -28,6 +31,8 @@ export default function WalletManagementModal({
 }: WalletManagementModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
+  const { updateAllBalances } = useWalletStore();
+  const [isUpdatingBalances, setIsUpdatingBalances] = useState(false);
   const {
     wallets,
     selectedWallet,
@@ -57,6 +62,17 @@ export default function WalletManagementModal({
     handleCopySecret,
     closeSecretModal,
   } = useWalletManagement();
+
+  // Update all wallet balances when modal opens
+  useEffect(() => {
+    if (visible) {
+      setIsUpdatingBalances(true);
+      // Start updating balances immediately when modal opens
+      updateAllBalances().finally(() => {
+        setIsUpdatingBalances(false);
+      });
+    }
+  }, [visible, updateAllBalances]);
 
 
   const renderWalletItem = ({
@@ -94,7 +110,28 @@ export default function WalletManagementModal({
           >
             Wallet Management
           </Typography>
-          <CloseButton onPress={onClose} />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={async () => {
+                setIsUpdatingBalances(true);
+                await updateAllBalances();
+                setIsUpdatingBalances(false);
+              }}
+              style={styles.refreshButton}
+              disabled={isUpdatingBalances}
+            >
+              {isUpdatingBalances ? (
+                <ActivityIndicator size="small" color={theme.text.SOFT_WHITE} />
+              ) : (
+                <MaterialCommunityIcons
+                  name="refresh"
+                  size={24}
+                  color={theme.text.SOFT_WHITE}
+                />
+              )}
+            </TouchableOpacity>
+            <CloseButton onPress={onClose} />
+          </View>
         </View>
 
         <View style={styles.content}>
@@ -114,13 +151,27 @@ export default function WalletManagementModal({
 
           {/* All Wallets Section Header */}
           <View style={styles.sectionHeader}>
-            <Typography
-              variant={TypographyVariant.TITLE_MEDIUM}
-              color={theme.text.SOFT_WHITE}
-              style={styles.sectionTitle}
-            >
-              All Wallets ({wallets.length})
-            </Typography>
+            <View style={styles.sectionTitleContainer}>
+              <Typography
+                variant={TypographyVariant.TITLE_MEDIUM}
+                color={theme.text.SOFT_WHITE}
+                style={styles.sectionTitle}
+              >
+                All Wallets ({wallets.length})
+              </Typography>
+              {isUpdatingBalances && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={theme.text.LIGHT_GREY} />
+                  <Typography
+                    variant={TypographyVariant.BODY_SMALL}
+                    color={theme.text.LIGHT_GREY}
+                    style={styles.loadingText}
+                  >
+                    Updating balances...
+                  </Typography>
+                </View>
+              )}
+            </View>
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 onPress={handleImportWallet}
@@ -282,6 +333,16 @@ const createStyles = (theme: any) =>
       paddingTop: 60,
       paddingBottom: 20,
     },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    refreshButton: {
+      padding: 8,
+      borderRadius: 20,
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
+    },
     content: {
       flex: 1,
       paddingHorizontal: EDGE_MARGIN,
@@ -295,8 +356,19 @@ const createStyles = (theme: any) =>
       alignItems: "center",
       marginBottom: 16,
     },
-    sectionTitle: {
+    sectionTitleContainer: {
       flex: 1,
+    },
+    sectionTitle: {
+      marginBottom: 4,
+    },
+    loadingContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    loadingText: {
+      fontSize: 12,
     },
     actionButtons: {
       flexDirection: "row",

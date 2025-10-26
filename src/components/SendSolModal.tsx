@@ -33,6 +33,7 @@ import RecipientSelection, { Contact as RecipientContact } from './RecipientSele
 import { Contact as SupabaseContact } from '../services/contactsService';
 import CloseButton from './CloseButton';
 import QRScanner from './QRScanner';
+import TransactionResultScreen, { TransactionStatus } from './TransactionResultScreen';
 
 // Services
 import { transactionService, TransferParams } from '../services/transactionService';
@@ -52,7 +53,6 @@ import {
   LabelText,
   RecipientType,
 } from '../constants/enums';
-import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { evaluateMathExpression } from '../utils/walletUtils';
 import { EDGE_MARGIN } from '../constants/styles';
 
@@ -99,6 +99,12 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   const [contacts, setContacts] = useState<RecipientContact[]>([]);
   const [favorites, setFavorites] = useState<RecipientContact[]>([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  // Transaction result state
+  const [showTransactionResult, setShowTransactionResult] = useState(false);
+  const [transactionStatus, setTransactionStatus] = useState<TransactionStatus>(TransactionStatus.PENDING);
+  const [transactionSignature, setTransactionSignature] = useState<string | undefined>();
+  const [transactionError, setTransactionError] = useState<string | undefined>();
 
   // Destructure form state for easier access
   const {
@@ -311,7 +317,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   // Handle send transaction
   const handleSend = async () => {
     if (!selectedWallet || !isValidAddress || !isValidAmount) {
-      showErrorToast(AlertMessage.CHECK_INPUTS_AND_TRY_AGAIN);
+      Alert.alert('Error', AlertMessage.CHECK_INPUTS_AND_TRY_AGAIN);
       return;
     }
 
@@ -321,7 +327,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
 
     // Final validation
     if (totalCost > balance) {
-      showErrorToast(AlertMessage.INSUFFICIENT_BALANCE);
+      Alert.alert('Error', AlertMessage.INSUFFICIENT_BALANCE);
       return;
     }
 
@@ -347,6 +353,12 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     if (!selectedWallet) return;
 
     setIsLoading(true);
+    
+    // Show transaction result screen with pending state
+    setTransactionStatus(TransactionStatus.PENDING);
+    setTransactionSignature(undefined);
+    setTransactionError(undefined);
+    setShowTransactionResult(true);
 
     try {
       const currentAmount = inputMode === InputMode.CURRENCY ? currencyAmount : amount;
@@ -382,34 +394,39 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
       );
 
       if (result.success && result.signature) {
-        showSuccessToast(`Transaction sent! Signature: ${result.signature.slice(0, 8)}...`);
-
-        // Clear form and close modal
-        setFormState(resetFormState());
-        onClose();
-
+        // Show success state
+        setTransactionStatus(TransactionStatus.SUCCESS);
+        setTransactionSignature(result.signature);
+        
         // Update balance
         await updateBalance();
       } else {
-        // Close modal first so user can see the error toast
-        onClose();
-        showErrorToast(result.error || AlertMessage.TRANSACTION_FAILED);
-        
-        // Clear form after closing
-        setFormState(resetFormState());
+        // Show error state
+        setTransactionStatus(TransactionStatus.FAILED);
+        setTransactionError(result.error || AlertMessage.TRANSACTION_FAILED);
       }
     } catch (error) {
       console.error('Transaction error:', error);
       
-      // Close modal first so user can see the error toast
-      onClose();
-      showErrorToast(error instanceof Error ? error.message : AlertMessage.TRANSACTION_FAILED);
-      
-      // Clear form after closing
-      setFormState(resetFormState());
+      // Show error state
+      setTransactionStatus(TransactionStatus.FAILED);
+      setTransactionError(error instanceof Error ? error.message : AlertMessage.TRANSACTION_FAILED);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Transaction result handlers
+  const handleTransactionResultClose = () => {
+    setShowTransactionResult(false);
+    setFormState(resetFormState());
+    onClose();
+  };
+
+  const handleTransactionRetry = () => {
+    setShowTransactionResult(false);
+    // Retry the transaction
+    executeTransaction();
   };
 
   // Contact handlers
@@ -697,6 +714,18 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
             isValidAddress: false
           }));
         }}
+      />
+
+      {/* Transaction Result Screen */}
+      <TransactionResultScreen
+        visible={showTransactionResult}
+        status={transactionStatus}
+        amount={inputMode === InputMode.CURRENCY ? currencyToSol(parseFloat(currencyAmount)) : parseFloat(amount)}
+        recipientAddress={recipientAddress}
+        transactionSignature={transactionSignature}
+        errorMessage={transactionError}
+        onClose={handleTransactionResultClose}
+        onRetry={transactionStatus === TransactionStatus.FAILED ? handleTransactionRetry : undefined}
       />
     </Modal>
   );

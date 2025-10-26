@@ -30,33 +30,22 @@ import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.j
 // Note: getConnection function removed as it's no longer used
 // We now use getBalanceWithFallback for all balance operations
 
-// Test basic network connectivity
-const testNetworkConnectivity = async (): Promise<boolean> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch('https://httpbin.org/get', {
-      method: 'GET',
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    await response.json();
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
+// Rate limiting for RPC calls
+let lastRpcCall = 0;
+const RPC_CALL_DELAY = 1000; // 1 second between calls (reduced from 2)
 
 // Helper function to get balance with fallback endpoints
 const getBalanceWithFallback = async (publicKey: PublicKey): Promise<number> => {
   let lastError: Error | null = null;
-  // First test basic network connectivity
-  const isNetworkAvailable = await testNetworkConnectivity();
-  if (!isNetworkAvailable) {
-    throw new Error('No network connectivity available');
+
+  // Rate limiting: ensure we don't make calls too frequently
+  const now = Date.now();
+  const timeSinceLastCall = now - lastRpcCall;
+  if (timeSinceLastCall < RPC_CALL_DELAY) {
+    const delay = RPC_CALL_DELAY - timeSinceLastCall;
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
+  lastRpcCall = Date.now();
 
   for (let i = 0; i < SOLANA_RPC_ENDPOINTS.length; i++) {
     try {
@@ -64,33 +53,28 @@ const getBalanceWithFallback = async (publicKey: PublicKey): Promise<number> => 
 
       const connection = new Connection(endpoint, {
         commitment: ConnectionCommitment.CONFIRMED,
-        confirmTransactionInitialTimeout: 5000, // 5 seconds timeout for faster failover
-        disableRetryOnRateLimit: false,
+        confirmTransactionInitialTimeout: 15000, // 15 seconds timeout
+        disableRetryOnRateLimit: true, // Disable automatic retries to avoid 429 spam
         httpHeaders: {
           'User-Agent': 'Neo-Payments-Wallet/1.0',
         },
       });
 
-      // First test if we can get the latest blockhash (basic connectivity test)
-      try {
-        await connection.getLatestBlockhash();
-      } catch (connectivityError) {
-        throw connectivityError; // Skip to next endpoint
-      }
-
+      // Skip connectivity test to reduce API calls
       const balance = await connection.getBalance(publicKey);
       return balance / LAMPORTS_PER_SOL;
     } catch (error) {
       lastError = error as Error;
 
-      // If this is not the last attempt, wait a bit
+      // If this is not the last attempt, wait longer between attempts
       if (i < SOLANA_RPC_ENDPOINTS.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
       }
     }
   }
 
-  return 0; // Return 0 instead of throwing error to prevent app crashes
+  // If all endpoints failed, return 0 instead of throwing to prevent app crashes
+  return 0;
 };
 
 export interface Wallet {
@@ -722,7 +706,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
           // Add delay between requests to avoid rate limiting (except for the last one)
           if (i < wallets.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         } catch (error) {
           updatedWallets.push(wallets[i]); // Return original wallet if balance update fails

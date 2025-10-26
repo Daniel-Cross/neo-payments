@@ -168,9 +168,12 @@ export enum SolanaNetwork {
 }
 
 // Fallback RPC endpoints for better reliability
+// Using more reliable endpoints with better rate limits
 export const SOLANA_RPC_ENDPOINTS = [
   'https://api.mainnet-beta.solana.com',
   'https://solana-api.projectserum.com',
+  'https://rpc.ankr.com/solana',
+  'https://solana-mainnet.g.alchemy.com/v2/demo', // Free tier with higher limits
 ] as const;
 
 export enum ConnectionCommitment {
