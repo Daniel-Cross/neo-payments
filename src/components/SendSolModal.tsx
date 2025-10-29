@@ -33,12 +33,11 @@ import RecipientSelection, { Contact as RecipientContact } from './RecipientSele
 import { Contact as SupabaseContact } from '../services/contactsService';
 import CloseButton from './CloseButton';
 import QRScanner from './QRScanner';
-import TransactionResultScreen, { TransactionStatus } from './TransactionResultScreen';
 
 // Services
-import { transactionService, TransferParams } from '../services/transactionService';
+import { transactionService } from '../services/transactionService';
 import { contactsService } from '../services/contactsService';
-import { calculateTotalCost } from '../utils/walletHelpers';
+import { calculateTotalCost, calculatePlatformFee } from '../utils/walletHelpers';
 
 // Constants and Utils
 import {
@@ -48,7 +47,6 @@ import {
   CardVariant,
   InputMode,
   ButtonText,
-  AlertTitle,
   AlertMessage,
   LabelText,
   RecipientType,
@@ -67,6 +65,15 @@ interface SendSolModalProps {
   initialRecipientAddress?: string;
   initialAmount?: string;
   initialMemo?: string;
+  onTransactionConfirm?: (transactionData: {
+    amount: number;
+    recipient: string;
+    memo?: string;
+    inputMode: string;
+    estimatedFee: number;
+    totalCost: number;
+    selectedCurrency: string;
+  }) => void;
 }
 
 // Helper functions
@@ -86,25 +93,20 @@ const resetFormState = () => ({
   selectedRecipientType: RecipientType.WALLET_ADDRESS,
 });
 
-export default function SendSolModal({ visible, onClose, initialRecipientAddress, initialAmount, initialMemo }: SendSolModalProps) {
+export default function SendSolModal({ visible, onClose, initialRecipientAddress, initialAmount, initialMemo, onTransactionConfirm }: SendSolModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
-  const { selectedWallet, balance, updateBalance, solPrice, selectedCurrency } = useWalletStore();
+  const { selectedWallet, balance, solPrice, selectedCurrency } = useWalletStore();
   const { optimalFee, isRefreshingFees, countdown } = useFeeMonitoring(visible);
 
   // Form state
   const [formState, setFormState] = useState(resetFormState());
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [contacts, setContacts] = useState<RecipientContact[]>([]);
   const [favorites, setFavorites] = useState<RecipientContact[]>([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
   
-  // Transaction result state
-  const [showTransactionResult, setShowTransactionResult] = useState(false);
-  const [transactionStatus, setTransactionStatus] = useState<TransactionStatus>(TransactionStatus.PENDING);
-  const [transactionSignature, setTransactionSignature] = useState<string | undefined>();
-  const [transactionError, setTransactionError] = useState<string | undefined>();
 
   // Destructure form state for easier access
   const {
@@ -321,113 +323,34 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
       return;
     }
 
-    const currentAmount = inputMode === InputMode.CURRENCY ? currencyAmount : amount;
-    const numAmount = parseFloat(currentAmount);
-    const solAmount = inputMode === InputMode.CURRENCY ? currencyToSol(numAmount) : numAmount;
-
     // Final validation
     if (totalCost > balance) {
       Alert.alert('Error', AlertMessage.INSUFFICIENT_BALANCE);
       return;
     }
 
-    // Show confirmation dialog
-    const amountDisplay =
-      inputMode === InputMode.CURRENCY
-        ? `${numAmount.toFixed(2)} ${selectedCurrency} (${solAmount.toFixed(6)} SOL)`
-        : `${solAmount.toFixed(6)} SOL`;
-
-    Alert.alert(
-      AlertTitle.CONFIRM_TRANSACTION,
-      `Send ${amountDisplay} to ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(
-        -8
-      )}?\n\nFee: ${estimatedFee.toFixed(6)} SOL\nTotal: ${totalCost.toFixed(6)} SOL`,
-      [
-        { text: ButtonText.CANCEL, style: 'cancel' },
-        { text: ButtonText.SEND, onPress: executeTransaction },
-      ]
-    );
-  };
-
-  const executeTransaction = async () => {
-    if (!selectedWallet) return;
-
-    setIsLoading(true);
+    // Get transaction details for the callback
+    const currentAmount = inputMode === InputMode.CURRENCY ? currencyAmount : amount;
+    const numAmount = parseFloat(currentAmount);
     
-    // Show transaction result screen with pending state
-    setTransactionStatus(TransactionStatus.PENDING);
-    setTransactionSignature(undefined);
-    setTransactionError(undefined);
-    setShowTransactionResult(true);
-
-    try {
-      const currentAmount = inputMode === InputMode.CURRENCY ? currencyAmount : amount;
-      const numAmount = parseFloat(currentAmount);
-      const solAmount = inputMode === InputMode.CURRENCY ? currencyToSol(numAmount) : numAmount;
-
-      // Encrypt memo if provided (so only recipient can read it)
-      let encryptedMemo: string | undefined;
-      if (memo && memo.trim()) {
-        try {
-          encryptedMemo = await transactionService.encryptMemoForRecipient(
-            memo.trim(),
-            recipientAddress
-          );
-        } catch (error) {
-          console.error('Failed to encrypt memo:', error);
-          encryptedMemo = memo.trim(); // Fallback to plain text if encryption fails
-        }
-      }
-
-      const transferParams: TransferParams = {
-        from: new PublicKey(selectedWallet.publicKey),
-        to: new PublicKey(recipientAddress),
-        amount: solAmount,
-        memo: encryptedMemo,
-      };
-
-      // Execute the transaction using our raw transaction service
-      const result = await transactionService.transferSOL(
-        transferParams,
-        selectedWallet.keypair,
-        true // Use versioned transaction for better performance
-      );
-
-      if (result.success && result.signature) {
-        // Show success state
-        setTransactionStatus(TransactionStatus.SUCCESS);
-        setTransactionSignature(result.signature);
-        
-        // Update balance
-        await updateBalance();
-      } else {
-        // Show error state
-        setTransactionStatus(TransactionStatus.FAILED);
-        setTransactionError(result.error || AlertMessage.TRANSACTION_FAILED);
-      }
-    } catch (error) {
-      console.error('Transaction error:', error);
-      
-      // Show error state
-      setTransactionStatus(TransactionStatus.FAILED);
-      setTransactionError(error instanceof Error ? error.message : AlertMessage.TRANSACTION_FAILED);
-    } finally {
-      setIsLoading(false);
+    // Close the send modal
+    onClose();
+    
+    // Notify parent component about transaction confirmation
+    if (onTransactionConfirm) {
+      onTransactionConfirm({
+        amount: numAmount, // Pass the original amount the user entered
+        recipient: recipientAddress,
+        memo: memo,
+        inputMode: inputMode,
+        estimatedFee: estimatedFee,
+        totalCost: totalCost,
+        selectedCurrency: selectedCurrency,
+      });
     }
   };
 
-  // Transaction result handlers
-  const handleTransactionResultClose = () => {
-    setShowTransactionResult(false);
-    setFormState(resetFormState());
-    onClose();
-  };
 
-  const handleTransactionRetry = () => {
-    setShowTransactionResult(false);
-    // Retry the transaction
-    executeTransaction();
-  };
 
   // Contact handlers
   const handleContactSelect = (contact: RecipientContact) => {
@@ -589,19 +512,27 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
                   <TouchableOpacity
                     style={styles.maxButton}
                     onPress={() => {
-                      // Use estimated fee or fallback to default fee
-                      const fee = estimatedFee > 0 ? estimatedFee : DEFAULT_FEE;
-                      const maxSol = balance - fee;
+                      // Calculate max amount accounting for both network fee and platform fee
+                      const networkFee = estimatedFee > 0 ? estimatedFee : DEFAULT_FEE;
+                      
+                      // Calculate platform fee for the current balance
+                      const platformFee = calculatePlatformFee(balance);
+                      
+                      // Max SOL = balance - network fee - platform fee
+                      const maxSol = balance - networkFee - platformFee;
+                      
+                      // Ensure max amount is not negative
+                      const safeMaxSol = Math.max(0, maxSol);
 
                       if (inputMode === InputMode.CURRENCY) {
                         setFormState(prev => ({ 
                           ...prev, 
-                          currencyAmount: solToCurrency(maxSol).toFixed(2) 
+                          currencyAmount: solToCurrency(safeMaxSol).toFixed(2) 
                         }));
                       } else {
                         setFormState(prev => ({ 
                           ...prev, 
-                          amount: maxSol.toString() 
+                          amount: safeMaxSol.toString() 
                         }));
                       }
                     }}
@@ -716,17 +647,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
         }}
       />
 
-      {/* Transaction Result Screen */}
-      <TransactionResultScreen
-        visible={showTransactionResult}
-        status={transactionStatus}
-        amount={inputMode === InputMode.CURRENCY ? currencyToSol(parseFloat(currencyAmount)) : parseFloat(amount)}
-        recipientAddress={recipientAddress}
-        transactionSignature={transactionSignature}
-        errorMessage={transactionError}
-        onClose={handleTransactionResultClose}
-        onRetry={transactionStatus === TransactionStatus.FAILED ? handleTransactionRetry : undefined}
-      />
+
     </Modal>
   );
 }

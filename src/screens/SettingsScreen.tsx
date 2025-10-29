@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Switch } from "react-native";
+import { useState } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { GradientBackground } from "../components/GradientBackground";
 import { GradientCard } from "../components/GradientCard";
@@ -7,10 +8,12 @@ import { GradientType, ButtonVariant, Route } from "../constants/enums";
 import { useWalletStore } from "../store/walletStore";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
+import BalanceDebugger from "../components/BalanceDebugger";
 
 const SettingsScreen = () => {
   const { theme, themeMode, toggleTheme } = useTheme();
   const { disconnectWallet } = useWalletStore();
+  const [showDebugger, setShowDebugger] = useState(false);
 
   const handleDisconnectWallet = async () => {
     try {
@@ -71,6 +74,16 @@ const SettingsScreen = () => {
           label: "Auto-lock Timer",
           type: "button",
           onPress: () => {},
+        },
+      ],
+    },
+    {
+      title: "Debug",
+      items: [
+        {
+          label: "Balance Debugger",
+          type: "button",
+          onPress: () => setShowDebugger(true),
         },
       ],
     },
@@ -179,6 +192,10 @@ const SettingsScreen = () => {
           </GradientCard>
         ))}
       </ScrollView>
+      
+      {showDebugger && (
+        <BalanceDebugger />
+      )}
     </GradientBackground>
   );
 };

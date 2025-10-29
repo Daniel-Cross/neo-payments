@@ -69,7 +69,7 @@ export default function WalletInfoCard({
         variant={TypographyVariant.HEADLINE_MEDIUM}
         color={theme.text.SOFT_WHITE}
       >
-        {balance.toFixed(4)} SOL
+        {balance.toFixed(6)} SOL
       </Typography>
       <Typography
         variant={TypographyVariant.BODY_MEDIUM}

@@ -116,7 +116,7 @@ export default function RequestScreen() {
   };
 
   const formatAmount = (amount: number) => {
-    return `${amount.toFixed(4)} SOL`;
+    return `${amount.toFixed(6)} SOL`;
   };
 
   const formatDate = (timestamp: number) => {

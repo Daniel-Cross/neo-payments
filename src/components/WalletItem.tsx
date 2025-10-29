@@ -66,7 +66,7 @@ export default function WalletItem({
             color={theme.text.SOFT_WHITE}
             style={styles.balanceText}
           >
-            {wallet.balance.toFixed(4)} SOL
+            {wallet.balance.toFixed(6)} SOL
           </Typography>
         </View>
 

@@ -167,14 +167,43 @@ export enum SolanaNetwork {
   TESTNET = 'https://api.testnet.solana.com',
 }
 
-// Fallback RPC endpoints for better reliability
-// Using more reliable endpoints with better rate limits
-export const SOLANA_RPC_ENDPOINTS = [
-  'https://api.mainnet-beta.solana.com',
-  'https://solana-api.projectserum.com',
-  'https://rpc.ankr.com/solana',
-  'https://solana-mainnet.g.alchemy.com/v2/demo', // Free tier with higher limits
-] as const;
+// RPC endpoints configuration
+// Priority: API key endpoints first, then free fallbacks
+export const getSolanaRpcEndpoints = (): string[] => {
+  const apiKey = process.env.EXPO_PUBLIC_SOLANA_RPC_API_KEY;
+  const provider = process.env.EXPO_PUBLIC_SOLANA_RPC_PROVIDER;
+
+  // If API key is provided, use it as primary endpoint
+  if (apiKey) {
+    const endpoints: { [key: string]: string } = {
+      helius: `https://mainnet.helius-rpc.com/?api-key=${apiKey}`,
+      quicknode: `https://YOUR_ENDPOINT.solana-mainnet.quiknode.pro/${apiKey}/`,
+      alchemy: `https://solana-mainnet.g.alchemy.com/v2/${apiKey}`,
+      genesysgo: `https://ssc-dao.genesysgo.net/${apiKey}`,
+    };
+
+    const primaryEndpoint = endpoints[provider as keyof typeof endpoints];
+    if (primaryEndpoint) {
+      return [
+        primaryEndpoint,
+        'https://api.mainnet-beta.solana.com', // Official fallback
+        'https://rpc.ankr.com/solana', // Free fallback
+        'https://solana.public-rpc.com', // Free fallback
+      ];
+    }
+  }
+
+  // Fallback to free endpoints if no API key
+  return [
+    'https://api.mainnet-beta.solana.com', // Official
+    'https://rpc.ankr.com/solana', // Free
+    'https://solana.public-rpc.com', // Free
+    'https://solana-mainnet.g.alchemy.com/v2/demo', // Demo (limited)
+  ];
+};
+
+// For backward compatibility
+export const SOLANA_RPC_ENDPOINTS = getSolanaRpcEndpoints();
 
 export enum ConnectionCommitment {
   CONFIRMED = 'confirmed',

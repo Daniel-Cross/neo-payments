@@ -44,7 +44,7 @@ const WalletBalanceCard = ({
         weight="700"
         style={styles.balanceAmount}
       >
-        {balance.toFixed(4)} SOL
+        {balance.toFixed(6)} SOL
       </Typography>
 
       <View style={styles.addressContainer}>

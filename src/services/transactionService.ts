@@ -5,7 +5,7 @@ import {
   SolanaNetwork,
   ConnectionCommitment,
   NetworkCongestion,
-  SOLANA_RPC_ENDPOINTS,
+  getSolanaRpcEndpoints,
 } from '../constants/enums';
 import {
   calculateTotalCost,
@@ -55,8 +55,13 @@ const getMemoProgram = (): PublicKey => {
 // Lazy-initialize connection to avoid crashes during module loading
 const createConnection = (network: SolanaNetwork = SolanaNetwork.MAINNET): Connection => {
   try {
-    // Use the first endpoint for now, we'll add fallback logic later
-    const endpoint = network === SolanaNetwork.MAINNET ? SOLANA_RPC_ENDPOINTS[0] : network;
+    // Get the first available endpoint
+    const endpoints = getSolanaRpcEndpoints();
+    if (endpoints.length === 0) {
+      throw new Error('No RPC endpoints available');
+    }
+
+    const endpoint = network === SolanaNetwork.MAINNET ? endpoints[0] : network;
 
     return new Connection(endpoint, {
       commitment: ConnectionCommitment.CONFIRMED,
@@ -138,9 +143,10 @@ export class TransactionService {
   ): Promise<T> {
     let lastError: Error | null = null;
 
-    for (let i = 0; i < Math.min(maxRetries, SOLANA_RPC_ENDPOINTS.length); i++) {
+    const rpcEndpoints = getSolanaRpcEndpoints();
+    for (let i = 0; i < Math.min(maxRetries, rpcEndpoints.length); i++) {
       try {
-        const endpoint = SOLANA_RPC_ENDPOINTS[i];
+        const endpoint = rpcEndpoints[i];
         const connection = new Connection(endpoint, {
           commitment: ConnectionCommitment.CONFIRMED,
           confirmTransactionInitialTimeout: 60000,
@@ -155,7 +161,7 @@ export class TransactionService {
         lastError = error as Error;
 
         // If this is the last attempt, don't wait
-        if (i < Math.min(maxRetries, SOLANA_RPC_ENDPOINTS.length) - 1) {
+        if (i < Math.min(maxRetries, rpcEndpoints.length) - 1) {
           // Simple delay between endpoint attempts
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -362,6 +368,22 @@ export class TransactionService {
     useVersioned: boolean = true // Default to versioned transactions for better performance
   ): Promise<TransactionResult> {
     try {
+      const { from, amount } = params;
+
+      // CRITICAL: Validate sufficient balance before creating transaction
+      const currentBalance = await this.getBalance(from);
+      const networkFee = 0.000005; // Default network fee
+      const totalRequired = amount + networkFee;
+
+      if (currentBalance < totalRequired) {
+        const shortfall = totalRequired - currentBalance;
+        throw new Error(
+          `Insufficient balance. You have ${currentBalance.toFixed(
+            6
+          )} SOL but need ${totalRequired.toFixed(6)} SOL. Shortfall: ${shortfall.toFixed(6)} SOL`
+        );
+      }
+
       let transaction: Transaction | VersionedTransaction;
 
       if (useVersioned) {
@@ -806,6 +828,19 @@ export class TransactionService {
       // Check if fee wallet is configured
       if (includePlatformFee && !isFeeWalletConfigured()) {
         throw new Error('Platform fee wallet not configured. Please contact support.');
+      }
+
+      // CRITICAL: Validate sufficient balance before creating transactions
+      const currentBalance = await this.getBalance(from);
+      const totalRequired = feeCalculation.breakdown.totalCost;
+
+      if (currentBalance < totalRequired) {
+        const shortfall = totalRequired - currentBalance;
+        throw new Error(
+          `Insufficient balance. You have ${currentBalance.toFixed(
+            6
+          )} SOL but need ${totalRequired.toFixed(6)} SOL. Shortfall: ${shortfall.toFixed(6)} SOL`
+        );
       }
 
       // Create the main transfer transaction

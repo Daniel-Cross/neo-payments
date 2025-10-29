@@ -9,7 +9,7 @@ import {
   ConnectionCommitment,
   NetworkCongestion,
   Currency,
-  SOLANA_RPC_ENDPOINTS,
+  getSolanaRpcEndpoints,
 } from '../constants/enums';
 import { priceService } from '../utils/priceService';
 import {
@@ -17,6 +17,7 @@ import {
   TransferParams,
   TransactionResult,
 } from '../services/transactionService';
+import { balanceService, BalanceUpdate } from '../services/balanceService';
 import { deriveKeypairFromSeedPhrase } from '../utils/keyDerivation';
 
 // Verify polyfills are loaded before importing Solana
@@ -32,12 +33,10 @@ import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.j
 
 // Rate limiting for RPC calls
 let lastRpcCall = 0;
-const RPC_CALL_DELAY = 1000; // 1 second between calls (reduced from 2)
+const RPC_CALL_DELAY = 100; // Reduced to 100ms for faster response
 
-// Helper function to get balance with fallback endpoints
+// Helper function to get balance with fallback endpoints - OPTIMIZED
 const getBalanceWithFallback = async (publicKey: PublicKey): Promise<number> => {
-  let lastError: Error | null = null;
-
   // Rate limiting: ensure we don't make calls too frequently
   const now = Date.now();
   const timeSinceLastCall = now - lastRpcCall;
@@ -47,34 +46,75 @@ const getBalanceWithFallback = async (publicKey: PublicKey): Promise<number> => 
   }
   lastRpcCall = Date.now();
 
-  for (let i = 0; i < SOLANA_RPC_ENDPOINTS.length; i++) {
-    try {
-      const endpoint = SOLANA_RPC_ENDPOINTS[i];
+  // Get RPC endpoints (with API key if available)
+  const rpcEndpoints = getSolanaRpcEndpoints();
 
+  // Try multiple endpoints in parallel for faster response
+  const balancePromises = rpcEndpoints.map(async endpoint => {
+    try {
       const connection = new Connection(endpoint, {
         commitment: ConnectionCommitment.CONFIRMED,
-        confirmTransactionInitialTimeout: 15000, // 15 seconds timeout
-        disableRetryOnRateLimit: true, // Disable automatic retries to avoid 429 spam
+        confirmTransactionInitialTimeout: 5000, // Reduced to 5 seconds for faster response
+        disableRetryOnRateLimit: true,
         httpHeaders: {
           'User-Agent': 'Neo-Payments-Wallet/1.0',
         },
       });
 
-      // Skip connectivity test to reduce API calls
       const balance = await connection.getBalance(publicKey);
-      return balance / LAMPORTS_PER_SOL;
-    } catch (error) {
-      lastError = error as Error;
+      const solBalance = balance / LAMPORTS_PER_SOL;
 
-      // If this is not the last attempt, wait longer between attempts
-      if (i < SOLANA_RPC_ENDPOINTS.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      return { success: true, balance: solBalance, endpoint };
+    } catch (error) {
+      return { success: false, error, endpoint };
+    }
+  });
+
+  try {
+    // Wait for the first successful response or all to fail
+    const results = await Promise.allSettled(balancePromises);
+
+    // Find the first successful result
+    for (const result of results) {
+      if (
+        result.status === 'fulfilled' &&
+        result.value.success &&
+        result.value.balance !== undefined
+      ) {
+        return result.value.balance;
       }
     }
-  }
 
-  // If all endpoints failed, return 0 instead of throwing to prevent app crashes
-  return 0;
+    // If all failed, try sequential fallback with shorter delays
+    for (let i = 0; i < rpcEndpoints.length; i++) {
+      try {
+        const endpoint = rpcEndpoints[i];
+        const connection = new Connection(endpoint, {
+          commitment: ConnectionCommitment.CONFIRMED,
+          confirmTransactionInitialTimeout: 3000, // Even shorter timeout for fallback
+          disableRetryOnRateLimit: true,
+          httpHeaders: {
+            'User-Agent': 'Neo-Payments-Wallet/1.0',
+          },
+        });
+
+        const balance = await connection.getBalance(publicKey);
+        const solBalance = balance / LAMPORTS_PER_SOL;
+
+        return solBalance;
+      } catch (error) {
+        // Shorter delay between fallback attempts
+        if (i < rpcEndpoints.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Reduced to 200ms
+        }
+      }
+    }
+
+    // If all endpoints failed, return 0 instead of throwing to prevent app crashes
+    return 0;
+  } catch (error) {
+    return 0;
+  }
 };
 
 export interface Wallet {
@@ -132,6 +172,7 @@ export interface WalletState {
   loadWallets: () => Promise<boolean>;
   disconnectWallet: () => Promise<void>;
   updateBalance: () => Promise<void>;
+  updateBalanceHelius: () => Promise<void>;
   updateAllBalances: () => Promise<void>;
   updateSolPrice: () => Promise<void>;
   setCurrency: (currency: Currency) => void;
@@ -153,6 +194,11 @@ export interface WalletState {
   // Debug methods
   refreshAllBalances: () => Promise<void>;
   testDerivation: (seedPhrase: string) => Promise<string[]>;
+
+  // Webhook subscription methods
+  subscribeToBalanceUpdates: () => Promise<void>;
+  unsubscribeFromBalanceUpdates: () => Promise<void>;
+  processBalanceUpdate: (update: BalanceUpdate) => void;
 }
 
 // Helper function to generate wallet name
@@ -687,6 +733,35 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
+  // Update balance using Helius Enhanced RPC
+  updateBalanceHelius: async () => {
+    const { selectedWallet, wallets } = get();
+    if (!selectedWallet) return;
+
+    try {
+      const solBalance = await balanceService.getBalance(selectedWallet.publicKey);
+
+      // Update the balance for the selected wallet
+      const updatedWallets = wallets.map(wallet =>
+        wallet.id === selectedWallet.id ? { ...wallet, balance: solBalance } : wallet
+      );
+
+      // Get current SOL price to calculate USD value
+      const { solPrice } = get();
+
+      set({
+        wallets: updatedWallets,
+        balance: solBalance,
+        fiatValue: solBalance * solPrice,
+        lastBalanceUpdate: Date.now(),
+      });
+    } catch (error) {
+      console.error('Failed to update balance with Helius:', error);
+      // Fallback to standard RPC
+      await get().updateBalance();
+    }
+  },
+
   // Update balances for all wallets
   updateAllBalances: async () => {
     const { wallets } = get();
@@ -696,22 +771,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
 
     try {
-      // Process balance updates sequentially to avoid rate limiting
-      const updatedWallets = [];
-      for (let i = 0; i < wallets.length; i++) {
+      // Process balance updates in parallel for much faster response
+      const balancePromises = wallets.map(async wallet => {
         try {
-          const wallet = wallets[i];
           const solBalance = await getBalanceWithFallback(wallet.keypair.publicKey);
-          updatedWallets.push({ ...wallet, balance: solBalance });
-
-          // Add delay between requests to avoid rate limiting (except for the last one)
-          if (i < wallets.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
+          return { ...wallet, balance: solBalance };
         } catch (error) {
-          updatedWallets.push(wallets[i]); // Return original wallet if balance update fails
+          return wallet; // Return original wallet if balance update fails
         }
-      }
+      });
+
+      const updatedWallets = await Promise.all(balancePromises);
 
       // Get current SOL price to calculate USD value
       const { solPrice, selectedWallet } = get();
@@ -991,5 +1061,53 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       console.error('Failed to generate additional addresses:', error);
       return false;
     }
+  },
+
+  // Subscribe to balance updates via Helius webhooks
+  subscribeToBalanceUpdates: async () => {
+    const { selectedWallet } = get();
+    if (!selectedWallet) return;
+
+    try {
+      await balanceService.subscribeToBalanceChanges(
+        selectedWallet.publicKey,
+        (update: BalanceUpdate) => {
+          // Process the balance update
+          get().processBalanceUpdate(update);
+        }
+      );
+    } catch (error) {
+      console.error('Failed to subscribe to balance updates:', error);
+    }
+  },
+
+  // Unsubscribe from balance updates
+  unsubscribeFromBalanceUpdates: async () => {
+    const { selectedWallet } = get();
+    if (!selectedWallet) return;
+
+    try {
+      await balanceService.unsubscribeFromBalanceChanges(selectedWallet.publicKey);
+    } catch (error) {
+      console.error('Failed to unsubscribe from balance updates:', error);
+    }
+  },
+
+  // Process balance update from webhook
+  processBalanceUpdate: (update: BalanceUpdate) => {
+    const { selectedWallet, wallets, solPrice } = get();
+    if (!selectedWallet || selectedWallet.publicKey !== update.address) return;
+
+    // Update the balance for the selected wallet
+    const updatedWallets = wallets.map(wallet =>
+      wallet.publicKey === update.address ? { ...wallet, balance: update.balance } : wallet
+    );
+
+    set({
+      wallets: updatedWallets,
+      balance: update.balance,
+      fiatValue: update.balance * solPrice,
+      lastBalanceUpdate: update.timestamp,
+    });
   },
 }));

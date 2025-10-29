@@ -19,7 +19,15 @@ export default function RootLayout() {
 }
 
 function AppNavigator() {
-  const { loadWallets } = useWalletStore();
+  const { 
+    loadWallets,  
+    updateSolPrice, 
+    updateBalanceHelius,
+    subscribeToBalanceUpdates,
+    unsubscribeFromBalanceUpdates,
+    isConnected, 
+    selectedWallet 
+  } = useWalletStore();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,6 +50,38 @@ function AppNavigator() {
 
     initializeApp();
   }, []);
+
+  // Update balances and prices when wallets are loaded and connected
+  useEffect(() => {
+    const updateWalletData = async () => {
+      if (isConnected && selectedWallet && !isLoading) {
+        try {
+          // Use Helius Enhanced RPC for faster balance updates
+          await Promise.all([
+            updateBalanceHelius(),
+            updateSolPrice()
+          ]);
+          
+          // Subscribe to real-time balance updates via webhooks
+          await subscribeToBalanceUpdates();
+        } catch (error) {
+          console.error("Failed to update wallet data:", error);
+        }
+      }
+    };
+
+    updateWalletData();
+  }, [isConnected, selectedWallet, isLoading, updateBalanceHelius, updateSolPrice, subscribeToBalanceUpdates]);
+
+  // Cleanup webhook subscriptions when component unmounts
+  useEffect(() => {
+    return () => {
+      if (isConnected && selectedWallet) {
+        unsubscribeFromBalanceUpdates();
+      }
+    };
+  }, [isConnected, selectedWallet, unsubscribeFromBalanceUpdates]);
+
 
   // Show loading screen while fonts or wallet are loading
   if (!fontsLoaded || isLoading) {

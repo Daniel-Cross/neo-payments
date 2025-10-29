@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Clipboard } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { GradientBackground } from './GradientBackground';
@@ -55,13 +55,38 @@ export default function TransactionResultScreen({
     return `${address.slice(0, 6)}...${address.slice(-6)}`;
   };
 
+  const copyTransactionId = () => {
+    if (transactionSignature) {
+      try {
+        Clipboard.setString(transactionSignature);
+      } catch (error) {
+        console.error('Failed to copy transaction ID:', error);
+      }
+    }
+  };
+
+  const formatErrorMessage = (error: string) => {
+    // Check for common error patterns and provide user-friendly messages
+    if (error.includes('insufficient lamports')) {
+      return 'Insufficient funds. Please check your balance and try again.';
+    }
+    if (error.includes('Simulation failed')) {
+      return 'Transaction failed. Please check your balance and try again.';
+    }
+    if (error.includes('custom program error')) {
+      return 'Transaction failed. Please check your balance and try again.';
+    }
+    // Return the original error if no pattern matches
+    return error;
+  };
+
   const getAnimationSource = () => {
     if (status === TransactionStatus.PENDING) {
-      return require('../../assets/animations/coin-loading.json');
+      return require('../../assets/animations/pending-transaction.json');
     } else if (status === TransactionStatus.SUCCESS) {
-      return require('../../assets/animations/success-check.json');
+      return require('../../assets/animations/success.json');
     } else {
-      return require('../../assets/animations/cross-error.json');
+      return require('../../assets/animations/error.json');
     }
   };
 
@@ -81,7 +106,7 @@ export default function TransactionResultScreen({
     } else if (status === TransactionStatus.SUCCESS) {
       return `Successfully sent ${amount.toFixed(6)} SOL to ${formatAddress(recipientAddress)}`;
     } else {
-      return errorMessage || 'Something went wrong with your transaction';
+      return 'Something went wrong with your transaction';
     }
   };
 
@@ -102,15 +127,16 @@ export default function TransactionResultScreen({
     }
   };
 
+  const handleClosePress = () => {
+    onClose();
+  };
+
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent={false}
-      onRequestClose={onClose}
-    >
-      <GradientBackground gradient={GradientType.PRIMARY} style={styles.container}>
-        <View style={styles.content}>
+    <GradientBackground gradient={GradientType.PRIMARY} style={styles.container}>
+      
+      <View style={styles.content}>
           {/* Animation */}
           <View style={styles.animationContainer}>
             <LottieView
@@ -137,9 +163,14 @@ export default function TransactionResultScreen({
               <Text style={[styles.detailsLabel, { color: theme.text.LIGHT_GREY }]}>
                 Transaction ID:
               </Text>
-              <Text style={[styles.detailsValue, { color: theme.text.SOFT_WHITE }]}>
-                {formatAddress(transactionSignature)}
-              </Text>
+              <TouchableOpacity onPress={copyTransactionId} style={styles.transactionIdContainer}>
+                <Text style={[styles.detailsValue, { color: theme.text.SOFT_WHITE }]}>
+                  {transactionSignature}
+                </Text>
+                <Text style={[styles.copyHint, { color: theme.text.LIGHT_GREY }]}>
+                  Tap to copy
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -147,7 +178,7 @@ export default function TransactionResultScreen({
           {showResult && status === TransactionStatus.FAILED && errorMessage && (
             <View style={styles.errorContainer}>
               <Text style={[styles.errorText, { color: theme.text.ERROR_RED }]}>
-                {errorMessage}
+                {formatErrorMessage(errorMessage)}
               </Text>
             </View>
           )}
@@ -155,23 +186,45 @@ export default function TransactionResultScreen({
           {/* Action Button */}
           {showResult && (
             <View style={styles.buttonContainer}>
-              <GradientButton
-                title={getButtonText()}
-                onPress={handleButtonPress}
-                variant={status === TransactionStatus.SUCCESS ? ButtonVariant.PRIMARY : ButtonVariant.SECONDARY}
-                style={styles.actionButton}
-              />
+              {status === TransactionStatus.FAILED && onRetry ? (
+                <View style={styles.failedButtonContainer}>
+                  <GradientButton
+                    title="Try Again"
+                    onPress={handleButtonPress}
+                    variant={ButtonVariant.PRIMARY}
+                    style={StyleSheet.flatten([styles.actionButton, styles.retryButton])}
+                  />
+                  <GradientButton
+                    title="Close"
+                    onPress={handleClosePress}
+                    variant={ButtonVariant.SECONDARY}
+                    style={StyleSheet.flatten([styles.actionButton, styles.closeButton])}
+                  />
+                </View>
+              ) : (
+                <GradientButton
+                  title={getButtonText()}
+                  onPress={handleButtonPress}
+                  variant={status === TransactionStatus.SUCCESS ? ButtonVariant.PRIMARY : ButtonVariant.SECONDARY}
+                  style={styles.actionButton}
+                />
+              )}
             </View>
           )}
         </View>
       </GradientBackground>
-    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  closeButtonContainer: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1000,
   },
   content: {
     flex: 1,
@@ -215,6 +268,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
   },
+  transactionIdContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  copyHint: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   errorContainer: {
     backgroundColor: 'rgba(255, 115, 125, 0.1)',
     borderRadius: 12,
@@ -229,7 +295,18 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
   },
-  actionButton: {
+  failedButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
     width: '100%',
+  },
+  actionButton: {
+    flex: 1,
+  },
+  retryButton: {
+    // Additional styles for retry button if needed
+  },
+  closeButton: {
+    // Additional styles for close button if needed
   },
 });
