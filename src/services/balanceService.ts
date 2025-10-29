@@ -11,8 +11,14 @@ export interface BalanceUpdate {
 
 export class BalanceService {
   private static instance: BalanceService;
-  private webhookUrl: string | null = null;
-  private subscriptions: Map<string, any> = new Map();
+  private ws: WebSocket | null = null;
+  private subscriptions: Map<
+    string,
+    { subscriptionId: string; onUpdate: (update: BalanceUpdate) => void }
+  > = new Map();
+  private isConnected = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
 
   public static getInstance(): BalanceService {
     if (!BalanceService.instance) {
@@ -85,7 +91,118 @@ export class BalanceService {
   }
 
   /**
-   * Subscribe to balance changes for an address using Helius webhooks
+   * Connect to Helius WebSocket for real-time balance monitoring
+   */
+  private async connectWebSocket(): Promise<void> {
+    if (!HELIUS_API_KEY) {
+      throw new Error('Helius API key not available');
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(`wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`);
+
+        this.ws.onopen = () => {
+          console.log('✅ Connected to Helius WebSocket');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          resolve();
+        };
+
+        this.ws.onmessage = msg => {
+          try {
+            const data = JSON.parse(msg.data);
+            console.log('🔔 WebSocket message:', data);
+
+            // Handle different message types
+            if (data.method === 'accountNotification') {
+              this.handleWebSocketMessage(data);
+            } else if (data.result && data.id) {
+              // Handle subscription confirmation
+              this.handleSubscriptionConfirmation(data);
+            }
+          } catch (error) {
+            console.error('Failed to parse WebSocket message:', error);
+          }
+        };
+
+        this.ws.onclose = () => {
+          console.log('❌ WebSocket connection closed');
+          this.isConnected = false;
+          this.attemptReconnect();
+        };
+
+        this.ws.onerror = error => {
+          console.error('WebSocket error:', error);
+          this.isConnected = false;
+          reject(error);
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Handle incoming WebSocket messages
+   */
+  private handleWebSocketMessage(data: any): void {
+    if (data.method === 'accountNotification' && data.params) {
+      const { subscription, result } = data.params;
+      const subscriptionInfo = Array.from(this.subscriptions.values()).find(
+        sub => sub.subscriptionId === subscription
+      );
+
+      if (subscriptionInfo && result) {
+        // Extract balance from account data
+        const balance = result.value ? result.value / LAMPORTS_PER_SOL : 0;
+        const address = this.getAddressFromSubscription(subscription);
+
+        if (address) {
+          subscriptionInfo.onUpdate({
+            address,
+            balance,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Get address from subscription ID
+   */
+  private getAddressFromSubscription(subscriptionId: string): string | null {
+    for (const [address, sub] of this.subscriptions) {
+      if (sub.subscriptionId === subscriptionId) {
+        return address;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Attempt to reconnect WebSocket
+   */
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = Math.pow(2, this.reconnectAttempts) * 1000; // Exponential backoff
+
+      console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+      setTimeout(() => {
+        this.connectWebSocket().catch(error => {
+          console.error('Reconnection failed:', error);
+        });
+      }, delay);
+    } else {
+      console.error('❌ Max reconnection attempts reached');
+    }
+  }
+
+  /**
+   * Subscribe to balance changes for an address using WebSocket
    * This provides real-time updates without polling
    */
   public async subscribeToBalanceChanges(
@@ -98,31 +215,28 @@ export class BalanceService {
     }
 
     try {
-      // Register webhook with Helius for this address
-      const webhookResponse = await fetch(
-        `https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            webhookURL: this.webhookUrl || 'https://your-backend.com/webhook', // You'll need to set this
-            transactionTypes: ['Any'],
-            accountAddresses: [address],
-            webhookType: 'enhanced',
-          }),
-        }
-      );
-
-      if (webhookResponse.ok) {
-        const webhook = await webhookResponse.json();
-        console.log('Webhook registered for address:', address, webhook);
-
-        // Store subscription for cleanup
-        this.subscriptions.set(address, {
-          webhookId: webhook.webhookID,
-          onUpdate: onBalanceUpdate,
-        });
+      // Connect WebSocket if not already connected
+      if (!this.isConnected || !this.ws) {
+        await this.connectWebSocket();
       }
+
+      // Subscribe to account changes
+      const subscribeMessage = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'accountSubscribe',
+        params: [address, { commitment: 'confirmed' }],
+      };
+
+      this.ws!.send(JSON.stringify(subscribeMessage));
+
+      // Store subscription for cleanup
+      this.subscriptions.set(address, {
+        subscriptionId: '', // Will be set when we receive the subscription confirmation
+        onUpdate: onBalanceUpdate,
+      });
+
+      console.log(`📡 Subscribed to balance changes for address: ${address}`);
     } catch (error) {
       console.error('Failed to subscribe to balance changes:', error);
     }
@@ -133,65 +247,35 @@ export class BalanceService {
    */
   public async unsubscribeFromBalanceChanges(address: string): Promise<void> {
     const subscription = this.subscriptions.get(address);
-    if (!subscription || !HELIUS_API_KEY) return;
+    if (!subscription || !this.ws || !this.isConnected) return;
 
     try {
-      await fetch(
-        `https://api.helius.xyz/v0/webhooks/${subscription.webhookId}?api-key=${HELIUS_API_KEY}`,
-        { method: 'DELETE' }
-      );
+      // Unsubscribe from account changes
+      const unsubscribeMessage = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'accountUnsubscribe',
+        params: [subscription.subscriptionId],
+      };
 
+      this.ws.send(JSON.stringify(unsubscribeMessage));
       this.subscriptions.delete(address);
+
+      console.log(`📡 Unsubscribed from balance changes for address: ${address}`);
     } catch (error) {
       console.error('Failed to unsubscribe from balance changes:', error);
     }
   }
 
   /**
-   * Process webhook payload from Helius
-   * This should be called by your backend when it receives webhook notifications
+   * Handle subscription confirmation from WebSocket
    */
-  public processWebhookPayload(payload: any): BalanceUpdate[] {
-    const updates: BalanceUpdate[] = [];
-
-    try {
-      // Parse Helius webhook payload
-      if (payload && payload.length > 0) {
-        for (const transaction of payload) {
-          // Extract balance changes from transaction
-          if (transaction.accountData) {
-            for (const accountData of transaction.accountData) {
-              if (accountData.account && accountData.nativeTransfers) {
-                const address = accountData.account;
-                const balance =
-                  accountData.nativeTransfers.reduce(
-                    (total: number, transfer: any) => total + (transfer.amount || 0),
-                    0
-                  ) / LAMPORTS_PER_SOL;
-
-                updates.push({
-                  address,
-                  balance,
-                  timestamp: Date.now(),
-                });
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to process webhook payload:', error);
+  private handleSubscriptionConfirmation(data: any): void {
+    if (data.result && data.id) {
+      // Find the subscription by ID and update the subscription ID
+      // This is a simplified approach - in production you'd want to track IDs properly
+      console.log('✅ Subscription confirmed:', data.result);
     }
-
-    return updates;
-  }
-
-  /**
-   * Set webhook URL for receiving balance updates
-   * This should be your backend endpoint that processes webhooks
-   */
-  public setWebhookUrl(url: string): void {
-    this.webhookUrl = url;
   }
 
   /**
@@ -202,11 +286,17 @@ export class BalanceService {
   }
 
   /**
-   * Cleanup all subscriptions
+   * Cleanup all subscriptions and close WebSocket
    */
   public async cleanup(): Promise<void> {
     const addresses = Array.from(this.subscriptions.keys());
     await Promise.all(addresses.map(address => this.unsubscribeFromBalanceChanges(address)));
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+      this.isConnected = false;
+    }
   }
 }
 

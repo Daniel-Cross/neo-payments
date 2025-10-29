@@ -177,7 +177,6 @@ export const getSolanaRpcEndpoints = (): string[] => {
   if (apiKey) {
     const endpoints: { [key: string]: string } = {
       helius: `https://mainnet.helius-rpc.com/?api-key=${apiKey}`,
-      quicknode: `https://YOUR_ENDPOINT.solana-mainnet.quiknode.pro/${apiKey}/`,
       alchemy: `https://solana-mainnet.g.alchemy.com/v2/${apiKey}`,
       genesysgo: `https://ssc-dao.genesysgo.net/${apiKey}`,
     };
