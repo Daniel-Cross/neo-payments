@@ -1,7 +1,7 @@
-import { Tabs } from "expo-router";
-import { useTheme } from "../../src/contexts/ThemeContext";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { TabName, IconName } from "../../src/constants/enums";
+import { Tabs } from 'expo-router';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { TabName, IconName } from '../../src/constants/enums';
 
 export default function TabsLayout() {
   const { theme } = useTheme();
@@ -18,41 +18,39 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: theme.text.LIGHT_GREY,
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "500",
+          fontWeight: '500',
         },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name='index'
         options={{
-          title: "Home",
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <TabIcon name={TabName.HOME} color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="requests"
+        name='requests'
         options={{
-          title: "Requests",
+          title: 'Requests',
           tabBarIcon: ({ color, size }) => (
             <TabIcon name={TabName.REQUESTS} color={color} size={size} />
           ),
         }}
       />
+      {/* History tab hidden - to be introduced at a later date */}
       <Tabs.Screen
-        name="history"
+        name='history'
         options={{
-          title: "History",
-          tabBarIcon: ({ color, size }) => (
-            <TabIcon name={TabName.HISTORY} color={color} size={size} />
-          ),
+          href: null, // Hide from tab bar
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name='settings'
         options={{
-          title: "Settings",
+          title: 'Settings',
           tabBarIcon: ({ color, size }) => (
             <TabIcon name={TabName.SETTINGS} color={color} size={size} />
           ),
@@ -63,15 +61,7 @@ export default function TabsLayout() {
 }
 
 // Simple icon component using text symbols
-function TabIcon({
-  name,
-  color,
-  size,
-}: {
-  name: TabName;
-  color: string;
-  size: number;
-}) {
+function TabIcon({ name, color, size }: { name: TabName; color: string; size: number }) {
   const { theme } = useTheme();
   const isActive = color === theme.colors.NEON_PINK;
 
@@ -80,11 +70,7 @@ function TabIcon({
       case TabName.HOME:
         return (
           <MaterialCommunityIcons
-            name={
-              isActive
-                ? IconName.LIGHTNING_BOLT
-                : IconName.LIGHTNING_BOLT_OUTLINE
-            }
+            name={isActive ? IconName.LIGHTNING_BOLT : IconName.LIGHTNING_BOLT_OUTLINE}
             size={size}
             color={color}
           />
@@ -92,11 +78,7 @@ function TabIcon({
       case TabName.REQUESTS:
         return (
           <MaterialCommunityIcons
-            name={
-              isActive
-                ? IconName.ACCOUNT_ARROW_UP
-                : IconName.ACCOUNT_ARROW_UP_OUTLINE
-            }
+            name={isActive ? IconName.ACCOUNT_ARROW_UP : IconName.ACCOUNT_ARROW_UP_OUTLINE}
             size={size}
             color={color}
           />
@@ -118,7 +100,7 @@ function TabIcon({
           />
         );
       default:
-        return "📱";
+        return '📱';
     }
   };
 

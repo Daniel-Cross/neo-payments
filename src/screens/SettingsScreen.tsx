@@ -31,17 +31,17 @@ const SettingsScreen = () => {
   };
 
   const settingsSections = [
-    {
-      title: 'Appearance',
-      items: [
-        {
-          label: 'Dark Mode',
-          type: 'switch',
-          value: themeMode === 'dark',
-          onToggle: toggleTheme,
-        },
-      ],
-    },
+    // {
+    //   title: 'Appearance',
+    //   items: [
+    //     {
+    //       label: 'Dark Mode',
+    //       type: 'switch',
+    //       value: themeMode === 'dark',
+    //       onToggle: toggleTheme,
+    //     },
+    //   ],
+    // },
     {
       title: 'Wallet',
       items: [
