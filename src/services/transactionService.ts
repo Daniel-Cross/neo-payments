@@ -99,6 +99,13 @@ export interface TransactionFeeEstimate {
   priorityFee?: number; // in lamports
 }
 
+export interface TransactionInstructionDetail {
+  programId: string;
+  programName?: string;
+  method?: string;
+  data?: string;
+}
+
 export interface TransactionDetails {
   signature: string;
   slot: number;
@@ -109,6 +116,8 @@ export interface TransactionDetails {
   amount: number;
   status: 'success' | 'failed';
   memo?: string;
+  instructions?: TransactionInstructionDetail[];
+  methods?: string[];
 }
 
 export class TransactionService {
@@ -464,7 +473,315 @@ export class TransactionService {
   }
 
   /**
+   * Get transaction history using Helius getTransactionsForAddress API
+   * This provides better filtering, sorting, and includes full transaction data
+   */
+  public async getTransactionHistoryHelius(
+    address: PublicKey,
+    options?: {
+      limit?: number;
+      sortOrder?: 'asc' | 'desc';
+      filters?: {
+        blockTime?: {
+          gte?: number;
+          lte?: number;
+          gt?: number;
+          lt?: number;
+          eq?: number;
+        };
+        status?: 'succeeded' | 'failed' | 'any';
+      };
+      paginationToken?: string;
+    }
+  ): Promise<{
+    transactions: TransactionDetails[];
+    paginationToken?: string;
+  }> {
+    const heliusApiKey = process.env.EXPO_PUBLIC_SOLANA_RPC_API_KEY;
+
+    if (!heliusApiKey) {
+      console.warn('Helius API key not available, falling back to standard RPC');
+      const transactions = await this.getTransactionHistory(address, options?.limit || 10);
+      return { transactions };
+    }
+
+    try {
+      const limit = options?.limit || 100;
+      const sortOrder = options?.sortOrder || 'desc';
+
+      const requestBody: any = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getTransactionsForAddress',
+        params: [
+          address.toString(),
+          {
+            transactionDetails: 'full',
+            sortOrder,
+            limit: Math.min(limit, 100), // Helius max is 100 for full transactions
+            encoding: 'jsonParsed',
+            maxSupportedTransactionVersion: 0,
+            ...(options?.paginationToken && { paginationToken: options.paginationToken }),
+            ...(options?.filters && { filters: options.filters }),
+          },
+        ],
+      };
+
+      const response = await fetch(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If response is not valid JSON, fall back to standard RPC
+        console.warn('Helius API returned invalid JSON, falling back to standard RPC');
+        const transactions = await this.getTransactionHistory(
+          address,
+          Math.min(options?.limit || 10, 10)
+        );
+        return { transactions };
+      }
+
+      // Check for JSON-RPC errors first
+      if (data.error) {
+        const errorMessage = data.error.message || JSON.stringify(data.error);
+        const errorCode = data.error.code;
+
+        // If method not found or not supported, fall back to standard RPC
+        if (
+          errorCode === -32601 ||
+          errorCode === -32002 ||
+          errorMessage.includes('not found') ||
+          errorMessage.includes('not available')
+        ) {
+          console.warn(
+            'Helius getTransactionsForAddress not available, falling back to standard RPC:',
+            errorMessage
+          );
+          const transactions = await this.getTransactionHistory(address, options?.limit || 10);
+          return { transactions };
+        }
+
+        throw new Error(`Helius API error: ${errorMessage} (code: ${errorCode})`);
+      }
+
+      // Check HTTP status
+      if (!response.ok) {
+        const statusText = response.statusText || `HTTP ${response.status}`;
+        const errorBody = data.error ? JSON.stringify(data.error) : 'Unknown error';
+        // If method not available, fall back gracefully
+        if (response.status === 400 || response.status === 403 || response.status === 429) {
+          console.warn('Helius API access issue, falling back to standard RPC:', statusText);
+          const transactions = await this.getTransactionHistory(
+            address,
+            Math.min(options?.limit || 10, 10)
+          );
+          return { transactions };
+        }
+        throw new Error(`Helius API request failed: ${statusText} - ${errorBody}`);
+      }
+
+      // Check if result exists
+      if (!data.result) {
+        console.warn('Helius API returned no result, falling back to standard RPC');
+        const transactions = await this.getTransactionHistory(
+          address,
+          Math.min(options?.limit || 10, 10)
+        );
+        return { transactions };
+      }
+
+      const transactions: TransactionDetails[] = [];
+      const rawTransactions = data.result?.data || [];
+
+      for (const tx of rawTransactions) {
+        if (!tx || !tx.transaction) continue;
+
+        const transactionDetails: TransactionDetails = {
+          signature: tx.transaction.signatures?.[0] || '',
+          slot: tx.slot || 0,
+          blockTime: tx.blockTime || 0,
+          fee: tx.meta?.fee || 0,
+          from: '',
+          to: '',
+          amount: 0,
+          status: tx.meta?.err ? 'failed' : 'success',
+          instructions: [],
+          methods: [],
+        };
+
+        // Parse transaction instructions and methods
+        const instructions: TransactionInstructionDetail[] = [];
+        const methods: string[] = [];
+        const accountKeys: string[] = [];
+
+        // Extract account keys
+        if (tx.transaction.message?.accountKeys) {
+          for (const key of tx.transaction.message.accountKeys) {
+            if (typeof key === 'string') {
+              accountKeys.push(key);
+            } else if (key?.pubkey) {
+              accountKeys.push(key.pubkey);
+            }
+          }
+        }
+
+        // Parse instructions to extract program IDs and methods
+        if (tx.transaction.message?.instructions) {
+          for (const instruction of tx.transaction.message.instructions) {
+            let programId = '';
+            let programName: string | undefined;
+            let method: string | undefined;
+            let data: string | undefined;
+
+            if (instruction.programId) {
+              programId =
+                typeof instruction.programId === 'string'
+                  ? instruction.programId
+                  : instruction.programId.toString();
+            } else if (instruction.program) {
+              programId =
+                typeof instruction.program === 'string'
+                  ? instruction.program
+                  : instruction.program.toString();
+            }
+
+            // Extract program name (known programs)
+            if (programId === '11111111111111111111111111111111') {
+              programName = 'System Program';
+            } else if (programId === 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo') {
+              programName = 'Memo Program';
+            } else if (programId === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') {
+              programName = 'Token Program';
+            } else if (programId === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') {
+              programName = 'Token-2022 Program';
+            } else if (programId === 'ComputeBudget111111111111111111111111111111') {
+              programName = 'Compute Budget Program';
+            } else if (programId === 'SysvarRent111111111111111111111111111111111') {
+              programName = 'Rent Sysvar';
+            }
+
+            // Extract method from instruction data or parsed instruction
+            if (instruction.parsed) {
+              // Parse instruction type from parsed data
+              if (instruction.parsed.type) {
+                method = instruction.parsed.type;
+              } else if (instruction.parsed.info?.type) {
+                method = instruction.parsed.info.type;
+              }
+
+              // Extract memo from parsed memo instruction
+              if (programName === 'Memo Program' && instruction.parsed) {
+                const memoText = instruction.parsed;
+                if (typeof memoText === 'string') {
+                  transactionDetails.memo = memoText;
+                } else if (typeof memoText === 'object' && memoText !== null) {
+                  // Try to get memo from parsed structure
+                  const memoValue = (memoText as any).memo || (memoText as any).text;
+                  if (typeof memoValue === 'string') {
+                    transactionDetails.memo = memoValue;
+                  }
+                }
+              }
+            } else if (instruction.data) {
+              // Convert data to string if it's a buffer
+              if (typeof instruction.data === 'string') {
+                data = instruction.data;
+              } else if (Buffer.isBuffer(instruction.data)) {
+                data = instruction.data.toString('base64');
+              } else if (instruction.data instanceof Uint8Array) {
+                data = Buffer.from(instruction.data).toString('base64');
+              }
+              // Try to infer method from program
+              if (programName === 'System Program') {
+                method = 'transfer'; // Most common System Program instruction
+              }
+            }
+
+            const txInstruction: TransactionInstructionDetail = {
+              programId,
+              programName,
+              method,
+              data,
+            };
+
+            instructions.push(txInstruction);
+            if (method) {
+              methods.push(method);
+            }
+            if (programName && !methods.includes(programName)) {
+              methods.push(programName);
+            }
+          }
+        }
+
+        transactionDetails.instructions = instructions;
+        transactionDetails.methods = methods;
+
+        // Extract transfer details from balance changes
+        if (tx.meta?.preBalances && tx.meta?.postBalances && accountKeys.length > 0) {
+          for (let i = 0; i < accountKeys.length && i < tx.meta.preBalances.length; i++) {
+            const balanceChange = tx.meta.preBalances[i] - tx.meta.postBalances[i];
+
+            if (balanceChange > 0) {
+              // Receiving SOL
+              if (!transactionDetails.to) {
+                transactionDetails.to = accountKeys[i];
+              }
+              transactionDetails.amount += balanceChange / LAMPORTS_PER_SOL;
+            } else if (balanceChange < 0) {
+              // Sending SOL
+              if (!transactionDetails.from) {
+                transactionDetails.from = accountKeys[i];
+              }
+            }
+          }
+        }
+
+        // If no explicit from/to found, try to infer from account keys
+        if (!transactionDetails.from && accountKeys.length > 0) {
+          transactionDetails.from = accountKeys[0];
+        }
+        if (!transactionDetails.to && accountKeys.length > 1) {
+          transactionDetails.to = accountKeys[1];
+        }
+
+        transactions.push(transactionDetails);
+      }
+
+      return {
+        transactions,
+        paginationToken: data.result?.paginationToken,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(
+        'Failed to get transaction history from Helius, falling back to standard RPC:',
+        errorMessage
+      );
+
+      // Fallback to standard RPC (but only try once to avoid rate limiting)
+      try {
+        const transactions = await this.getTransactionHistory(
+          address,
+          Math.min(options?.limit || 10, 10) // Limit to 10 for fallback to avoid rate limits
+        );
+        return { transactions };
+      } catch (fallbackError) {
+        console.error('Fallback to standard RPC also failed:', fallbackError);
+        // Return empty array instead of throwing to prevent app crashes
+        return { transactions: [] };
+      }
+    }
+  }
+
+  /**
    * Get transaction history for an address with fallback endpoints
+   * This is the legacy method using standard Solana RPC
    */
   public async getTransactionHistory(
     address: PublicKey,
@@ -479,8 +796,10 @@ export class TransactionService {
         const signatureStrings = signatures.map(sig => sig.signature);
 
         // Fetch all transactions in a single batch call (more efficient)
+        // Use jsonParsed encoding to get parsed instruction data (better for memo extraction)
         const txs = await connection.getTransactions(signatureStrings, {
           maxSupportedTransactionVersion: 0,
+          commitment: 'confirmed',
         });
 
         // Process the batch results
@@ -499,12 +818,16 @@ export class TransactionService {
               to: '', // Will be parsed from transaction
               amount: 0, // Will be calculated
               status: tx.meta.err ? 'failed' : 'success',
+              instructions: [],
+              methods: [],
             };
 
             // Parse transfer details with proper handling for both legacy and versioned transactions
             try {
               const message = tx.transaction.message;
               let accountKeys: PublicKey[];
+              const instructions: TransactionInstructionDetail[] = [];
+              const methods: string[] = [];
 
               // Get account keys based on transaction type
               if ('accountKeys' in message) {
@@ -521,6 +844,117 @@ export class TransactionService {
                   }
                 }
               }
+
+              // Extract instructions and methods
+              if ('instructions' in message) {
+                const txInstructions = message.instructions;
+                for (const instruction of txInstructions) {
+                  let programId: string;
+                  let programName: string | undefined;
+                  let method: string | undefined;
+                  let data: string | undefined;
+
+                  // Handle both legacy and versioned transaction instructions
+                  if ('programId' in instruction && instruction.programId instanceof PublicKey) {
+                    // Legacy transaction instruction
+                    programId = instruction.programId.toString();
+                  } else if ('programIdIndex' in instruction) {
+                    // Versioned transaction instruction - use index to get program ID
+                    const programIndex = instruction.programIdIndex;
+                    if (programIndex < accountKeys.length) {
+                      programId = accountKeys[programIndex].toString();
+                    } else {
+                      continue; // Skip invalid instruction
+                    }
+                  } else {
+                    continue; // Skip unknown instruction format
+                  }
+
+                  // Map known program IDs
+                  if (programId === '11111111111111111111111111111111') {
+                    programName = 'System Program';
+                  } else if (programId === 'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo') {
+                    programName = 'Memo Program';
+                  } else if (programId === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') {
+                    programName = 'Token Program';
+                  } else if (programId === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') {
+                    programName = 'Token-2022 Program';
+                  } else if (programId === 'ComputeBudget111111111111111111111111111111') {
+                    programName = 'Compute Budget Program';
+                  }
+
+                  // Extract instruction data
+                  if ('data' in instruction && instruction.data) {
+                    const instructionData = instruction.data;
+                    if (Buffer.isBuffer(instructionData)) {
+                      data = instructionData.toString('base64');
+                    } else if (Array.isArray(instructionData)) {
+                      // Handle array/Uint8Array
+                      try {
+                        data = Buffer.from(instructionData).toString('base64');
+                      } catch (e) {
+                        // If conversion fails, skip data
+                      }
+                    }
+                  }
+
+                  // Infer method from program
+                  if (programName === 'System Program') {
+                    method = 'transfer';
+                  } else if (programName === 'Memo Program') {
+                    method = 'memo';
+
+                    // Extract memo directly from instruction data (more reliable than log messages)
+                    if (instruction.data) {
+                      try {
+                        let memoData: Buffer | Uint8Array | string;
+
+                        if (Buffer.isBuffer(instruction.data)) {
+                          memoData = instruction.data;
+                        } else if (Array.isArray(instruction.data)) {
+                          memoData = Buffer.from(instruction.data);
+                        } else {
+                          memoData = instruction.data;
+                        }
+
+                        // Memo instruction data is UTF-8 encoded text
+                        if (
+                          Buffer.isBuffer(memoData) ||
+                          (Array.isArray(memoData) && memoData.length > 0)
+                        ) {
+                          const memoText = Buffer.from(memoData)
+                            .toString('utf-8')
+                            .replace(/\0/g, '');
+                          if (memoText.trim()) {
+                            transactionDetails.memo = memoText.trim();
+                          }
+                        } else if (typeof memoData === 'string') {
+                          transactionDetails.memo = memoData.trim();
+                        }
+                      } catch (memoError) {
+                        // If direct extraction fails, will try log messages as fallback
+                      }
+                    }
+                  }
+
+                  instructions.push({
+                    programId,
+                    programName,
+                    method,
+                    data,
+                  });
+
+                  if (method) {
+                    methods.push(method);
+                  }
+                  if (programName && !methods.includes(programName)) {
+                    methods.push(programName);
+                  }
+                }
+              }
+
+              transactionDetails.instructions = instructions;
+              transactionDetails.methods = methods;
 
               // Calculate amount from balance changes
               if (tx.meta.preBalances && tx.meta.postBalances && accountKeys.length >= 2) {

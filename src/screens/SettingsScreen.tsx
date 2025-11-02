@@ -1,108 +1,84 @@
-import { View, Text, StyleSheet, ScrollView, Switch } from "react-native";
-import { useState } from "react";
-import { useTheme } from "../contexts/ThemeContext";
-import { GradientBackground } from "../components/GradientBackground";
-import { GradientCard } from "../components/GradientCard";
-import { GradientButton } from "../components/GradientButton";
-import { GradientType, ButtonVariant, Route } from "../constants/enums";
-import { useWalletStore } from "../store/walletStore";
-import { router } from "expo-router";
-import Toast from "react-native-toast-message";
-import BalanceDebugger from "../components/BalanceDebugger";
+import { View, Text, StyleSheet, ScrollView, Switch } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import { GradientBackground } from '../components/GradientBackground';
+import { GradientCard } from '../components/GradientCard';
+import { GradientButton } from '../components/GradientButton';
+import { GradientType, ButtonVariant, Route } from '../constants/enums';
+import { useWalletStore } from '../store/walletStore';
+import { router } from 'expo-router';
+import Toast from 'react-native-toast-message';
 
 const SettingsScreen = () => {
   const { theme, themeMode, toggleTheme } = useTheme();
   const { disconnectWallet } = useWalletStore();
-  const [showDebugger, setShowDebugger] = useState(false);
 
   const handleDisconnectWallet = async () => {
     try {
       await disconnectWallet();
       Toast.show({
-        type: "success",
-        text1: "Wallet Disconnected",
-        text2:
-          "Your wallet has been disconnected and removed from secure storage.",
+        type: 'success',
+        text1: 'Wallet Disconnected',
+        text2: 'Your wallet has been disconnected and removed from secure storage.',
       });
       router.replace(Route.TABS);
     } catch (error) {
       Toast.show({
-        type: "error",
-        text1: "Error",
-        text2: "Failed to disconnect wallet. Please try again.",
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to disconnect wallet. Please try again.',
       });
     }
   };
 
   const settingsSections = [
     {
-      title: "Appearance",
+      title: 'Appearance',
       items: [
         {
-          label: "Dark Mode",
-          type: "switch",
-          value: themeMode === "dark",
+          label: 'Dark Mode',
+          type: 'switch',
+          value: themeMode === 'dark',
           onToggle: toggleTheme,
         },
       ],
     },
     {
-      title: "Wallet",
+      title: 'Wallet',
       items: [
         {
-          label: "Export Private Key",
-          type: "button",
-          onPress: () => {},
-        },
-        {
-          label: "Disconnect Wallet",
-          type: "button",
+          label: 'Disconnect Wallet',
+          type: 'button',
           onPress: handleDisconnectWallet,
         },
       ],
     },
     {
-      title: "Security",
+      title: 'Security',
       items: [
         {
-          label: "Biometric Authentication",
-          type: "switch",
+          label: 'Face ID Authentication',
+          type: 'switch',
           value: false,
           onToggle: () => {},
         },
-        {
-          label: "Auto-lock Timer",
-          type: "button",
-          onPress: () => {},
-        },
       ],
     },
     {
-      title: "Debug",
+      title: 'About',
       items: [
         {
-          label: "Balance Debugger",
-          type: "button",
-          onPress: () => setShowDebugger(true),
-        },
-      ],
-    },
-    {
-      title: "About",
-      items: [
-        {
-          label: "Version",
-          type: "text",
-          value: "1.0.0",
+          label: 'Version',
+          type: 'text',
+          value: '1.0.0',
         },
         {
-          label: "Privacy Policy",
-          type: "button",
+          label: 'Privacy Policy',
+          type: 'button',
           onPress: () => {},
         },
         {
-          label: "Terms of Service",
-          type: "button",
+          label: 'Terms of Service',
+          type: 'button',
           onPress: () => {},
         },
       ],
@@ -111,12 +87,10 @@ const SettingsScreen = () => {
 
   const renderSettingItem = (item: any) => {
     switch (item.type) {
-      case "switch":
+      case 'switch':
         return (
           <View style={styles.settingItem}>
-            <Text
-              style={[styles.settingLabel, { color: theme.text.SOFT_WHITE }]}
-            >
+            <Text style={[styles.settingLabel, { color: theme.text.SOFT_WHITE }]}>
               {item.label}
             </Text>
             <Switch
@@ -126,11 +100,11 @@ const SettingsScreen = () => {
                 false: theme.background.PURPLE_LIGHTER,
                 true: theme.colors.ELECTRIC_BLUE,
               }}
-              thumbColor={item.value ? "#fff" : "#f4f3f4"}
+              thumbColor={item.value ? '#fff' : '#f4f3f4'}
             />
           </View>
         );
-      case "button":
+      case 'button':
         return (
           <GradientButton
             title={item.label}
@@ -139,17 +113,13 @@ const SettingsScreen = () => {
             style={styles.settingButton}
           />
         );
-      case "text":
+      case 'text':
         return (
           <View style={styles.settingItem}>
-            <Text
-              style={[styles.settingLabel, { color: theme.text.SOFT_WHITE }]}
-            >
+            <Text style={[styles.settingLabel, { color: theme.text.SOFT_WHITE }]}>
               {item.label}
             </Text>
-            <Text
-              style={[styles.settingValue, { color: theme.text.LIGHT_GREY }]}
-            >
+            <Text style={[styles.settingValue, { color: theme.text.LIGHT_GREY }]}>
               {item.value}
             </Text>
           </View>
@@ -160,28 +130,18 @@ const SettingsScreen = () => {
   };
 
   return (
-    <GradientBackground
-      gradient={GradientType.PRIMARY}
-      style={styles.container}
-    >
+    <GradientBackground gradient={GradientType.PRIMARY} style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>
-          Settings
-        </Text>
+        <Text style={[styles.title, { color: theme.text.SOFT_WHITE }]}>Settings</Text>
         <Text style={[styles.subtitle, { color: theme.text.LIGHT_GREY }]}>
           Customize your Neo experience
         </Text>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {settingsSections.map((section, sectionIndex) => (
           <GradientCard key={sectionIndex} style={styles.sectionCard}>
-            <Text
-              style={[styles.sectionTitle, { color: theme.text.SOFT_WHITE }]}
-            >
+            <Text style={[styles.sectionTitle, { color: theme.text.SOFT_WHITE }]}>
               {section.title}
             </Text>
             {section.items.map((item, itemIndex) => (
@@ -192,10 +152,6 @@ const SettingsScreen = () => {
           </GradientCard>
         ))}
       </ScrollView>
-      
-      {showDebugger && (
-        <BalanceDebugger />
-      )}
     </GradientBackground>
   );
 };
@@ -210,7 +166,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   subtitle: {
@@ -225,16 +181,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 16,
   },
   settingContainer: {
     marginBottom: 12,
   },
   settingItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   settingLabel: {
     fontSize: 16,

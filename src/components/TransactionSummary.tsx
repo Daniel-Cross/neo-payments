@@ -34,85 +34,70 @@ const TransactionSummary = ({
 
   return (
     <View style={[styles.container, style]}>
-      <Typography 
-        variant={TypographyVariant.BODY_MEDIUM} 
+      <Typography
+        variant={TypographyVariant.BODY_MEDIUM}
         color={theme.text.SOFT_WHITE}
-        weight="600"
+        weight='600'
         style={styles.title}
       >
         Transaction Summary
       </Typography>
-      
+
       <View style={styles.summaryRow}>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM}
-          color={theme.text.LIGHT_GREY}
-        >
+        <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.LIGHT_GREY}>
           Amount:
         </Typography>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM}
-          color={theme.text.SOFT_WHITE}
-        >
-          {inputMode === InputMode.CURRENCY 
-            ? `${numAmount.toFixed(2)} ${selectedCurrency} (${solAmount.toFixed(6)} SOL)`
-            : `${solAmount.toFixed(6)} SOL (${solToCurrency(solAmount).toFixed(2)} ${selectedCurrency})`
-          }
+        <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.SOFT_WHITE}>
+          {inputMode === InputMode.CURRENCY
+            ? `${solAmount.toFixed(6)} SOL (${numAmount.toFixed(2)} ${selectedCurrency})`
+            : `${solAmount.toFixed(6)} SOL (${solToCurrency(solAmount).toFixed(
+                2
+              )} ${selectedCurrency})`}
         </Typography>
       </View>
-      
+
       {platformFee > 0 && (
         <View style={styles.summaryRow}>
-          <Typography 
-            variant={TypographyVariant.BODY_MEDIUM}
-            color={theme.text.LIGHT_GREY}
-          >
+          <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.LIGHT_GREY}>
             Platform Fee:
           </Typography>
-          <Typography 
-            variant={TypographyVariant.BODY_MEDIUM}
-            color={theme.text.SOFT_WHITE}
-          >
-            {platformFee.toFixed(6)} SOL ({solToCurrency(platformFee).toFixed(2)} {selectedCurrency})
+          <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.SOFT_WHITE}>
+            {platformFee.toFixed(6)} SOL ({solToCurrency(platformFee).toFixed(2)} {selectedCurrency}
+            )
           </Typography>
         </View>
       )}
-      
+
       <View style={styles.summaryRow}>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM}
-          color={theme.text.LIGHT_GREY}
-        >
+        <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.LIGHT_GREY}>
           Network Fee:
         </Typography>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM}
-          color={theme.text.SOFT_WHITE}
-        >
-          {estimatedFee.toFixed(6)} SOL ({solToCurrency(estimatedFee).toFixed(2)} {selectedCurrency})
+        <Typography variant={TypographyVariant.BODY_MEDIUM} color={theme.text.SOFT_WHITE}>
+          {estimatedFee.toFixed(6)} SOL ({solToCurrency(estimatedFee).toFixed(2)} {selectedCurrency}
+          )
         </Typography>
       </View>
-      
+
       <View style={[styles.summaryRow, styles.totalRow]}>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM} 
+        <Typography
+          variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.SOFT_WHITE}
-          weight="600"
+          weight='600'
         >
           Total:
         </Typography>
-        <Typography 
-          variant={TypographyVariant.BODY_MEDIUM} 
+        <Typography
+          variant={TypographyVariant.BODY_MEDIUM}
           color={theme.text.SOFT_WHITE}
-          weight="600"
+          weight='600'
         >
           {totalCost.toFixed(6)} SOL ({solToCurrency(totalCost).toFixed(2)} {selectedCurrency})
         </Typography>
       </View>
-      
+
       {hasInsufficientBalance && (
-        <Typography 
-          variant={TypographyVariant.CAPTION} 
+        <Typography
+          variant={TypographyVariant.CAPTION}
           color={theme.text.ERROR_RED}
           style={styles.insufficientText}
         >

@@ -18,6 +18,8 @@ import {
   TransactionResult,
 } from '../services/transactionService';
 import { balanceService, BalanceUpdate } from '../services/balanceService';
+import { notificationService } from '../services/notificationService';
+import { transactionWebhookService } from '../services/transactionWebhookService';
 import { deriveKeypairFromSeedPhrase } from '../utils/keyDerivation';
 
 // Verify polyfills are loaded before importing Solana
@@ -199,6 +201,12 @@ export interface WalletState {
   subscribeToBalanceUpdates: () => Promise<void>;
   unsubscribeFromBalanceUpdates: () => Promise<void>;
   processBalanceUpdate: (update: BalanceUpdate) => void;
+
+  // Transaction webhook and notification methods
+  subscribeToTransactionWebhooks: () => Promise<void>;
+  unsubscribeFromTransactionWebhooks: () => Promise<void>;
+  processTransactionWebhook: (payload: any) => void;
+  registerPushNotifications: () => Promise<string | null>;
 }
 
 // Helper function to generate wallet name
@@ -954,7 +962,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
-  // Get transaction history
+  // Get transaction history using Helius API (with fallback to standard RPC)
   getTransactionHistory: async () => {
     const { selectedWallet } = get();
 
@@ -964,9 +972,16 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
     try {
       const publicKey = new PublicKey(selectedWallet.publicKey);
-      return await transactionService.getTransactionHistory(publicKey);
+      // Try Helius first, which includes methods and instructions
+      // Use smaller limit initially to avoid rate limits
+      const result = await transactionService.getTransactionHistoryHelius(publicKey, {
+        limit: 20, // Reduced from 100 to avoid rate limits
+        sortOrder: 'desc',
+      });
+      return result.transactions || [];
     } catch (error) {
       console.error('Failed to get transaction history:', error);
+      // Fallback to empty array if both methods fail
       return [];
     }
   },
@@ -1109,5 +1124,118 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       fiatValue: update.balance * solPrice,
       lastBalanceUpdate: update.timestamp,
     });
+  },
+
+  // Register for push notifications
+  registerPushNotifications: async () => {
+    try {
+      const token = await notificationService.registerForPushNotifications();
+      return token;
+    } catch (error) {
+      console.error('Failed to register for push notifications:', error);
+      return null;
+    }
+  },
+
+  // Subscribe to transaction webhooks via Helius
+  subscribeToTransactionWebhooks: async () => {
+    const { wallets } = get();
+
+    if (wallets.length === 0) {
+      console.warn('No wallets to monitor');
+      return;
+    }
+
+    try {
+      // Get all wallet addresses
+      const addresses = wallets.map(w => w.publicKey);
+
+      // Get webhook URL from environment or use a default
+      // NOTE: You need to set up a backend endpoint to receive webhook POST requests
+      const webhookUrl =
+        process.env.EXPO_PUBLIC_WEBHOOK_URL ||
+        `${
+          process.env.EXPO_PUBLIC_WEBHOOK_BASE_URL || 'https://your-backend.com'
+        }/webhooks/transactions`;
+
+      // Check if webhook already exists
+      const existingWebhooks = await transactionWebhookService.getWebhooks();
+      const existingWebhook = existingWebhooks.find(
+        wh => wh.accountAddresses && addresses.every(addr => wh.accountAddresses.includes(addr))
+      );
+
+      if (existingWebhook) {
+        // Update existing webhook with all addresses
+        const allAddresses = [...new Set([...existingWebhook.accountAddresses, ...addresses])];
+        await transactionWebhookService.updateWebhook(
+          existingWebhook.webhookID,
+          allAddresses,
+          webhookUrl
+        );
+        console.log('✅ Updated existing transaction webhook');
+      } else {
+        // Create new webhook
+        const webhookId = await transactionWebhookService.createWebhook(addresses, webhookUrl);
+        if (webhookId) {
+          console.log('✅ Created transaction webhook:', webhookId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to subscribe to transaction webhooks:', error);
+    }
+  },
+
+  // Unsubscribe from transaction webhooks
+  unsubscribeFromTransactionWebhooks: async () => {
+    try {
+      const webhookId = transactionWebhookService.getWebhookId();
+      if (webhookId) {
+        await transactionWebhookService.deleteWebhook(webhookId);
+        console.log('✅ Unsubscribed from transaction webhooks');
+      }
+    } catch (error) {
+      console.error('Failed to unsubscribe from transaction webhooks:', error);
+    }
+  },
+
+  // Process transaction webhook payload (typically called from backend endpoint)
+  processTransactionWebhook: (payload: any) => {
+    const { selectedWallet, wallets } = get();
+
+    try {
+      // Parse webhook payload
+      const transactions = transactionWebhookService.parseWebhookPayload(
+        Array.isArray(payload) ? payload : [payload]
+      );
+
+      for (const tx of transactions) {
+        // Check if this transaction is relevant to any of our wallets
+        const relevantWallet = wallets.find(w => w.publicKey === tx.from || w.publicKey === tx.to);
+
+        if (relevantWallet) {
+          // Update balance for affected wallet
+          const updatedWallets = wallets.map(wallet =>
+            wallet.publicKey === relevantWallet.publicKey
+              ? {
+                  ...wallet,
+                  balance:
+                    tx.type === 'received'
+                      ? wallet.balance + tx.amount
+                      : wallet.balance - tx.amount,
+                }
+              : wallet
+          );
+
+          set({ wallets: updatedWallets });
+
+          // Show push notification if this is the selected wallet
+          if (selectedWallet && selectedWallet.publicKey === relevantWallet.publicKey) {
+            notificationService.showTransactionNotification(tx);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to process transaction webhook:', error);
+    }
   },
 }));

@@ -93,7 +93,14 @@ const resetFormState = () => ({
   selectedRecipientType: RecipientType.WALLET_ADDRESS,
 });
 
-export default function SendSolModal({ visible, onClose, initialRecipientAddress, initialAmount, initialMemo, onTransactionConfirm }: SendSolModalProps) {
+export default function SendSolModal({
+  visible,
+  onClose,
+  initialRecipientAddress,
+  initialAmount,
+  initialMemo,
+  onTransactionConfirm,
+}: SendSolModalProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
@@ -106,7 +113,6 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   const [contacts, setContacts] = useState<RecipientContact[]>([]);
   const [favorites, setFavorites] = useState<RecipientContact[]>([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
-  
 
   // Destructure form state for easier access
   const {
@@ -174,7 +180,12 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   // Validate recipient address
   const validateAddress = useCallback(async (address: string) => {
     if (!address.trim()) {
-      setFormState(prev => ({ ...prev, isValidAddress: false, isValidatingAddress: false, recipientBalance: null }));
+      setFormState(prev => ({
+        ...prev,
+        isValidAddress: false,
+        isValidatingAddress: false,
+        recipientBalance: null,
+      }));
       return;
     }
 
@@ -190,27 +201,27 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
       try {
         const recipientPubkey = new PublicKey(address);
         const balance = await transactionService.getBalance(recipientPubkey);
-        setFormState(prev => ({ 
-          ...prev, 
-          isValidAddress: true, 
-          isValidatingAddress: false, 
-          recipientBalance: balance 
+        setFormState(prev => ({
+          ...prev,
+          isValidAddress: true,
+          isValidatingAddress: false,
+          recipientBalance: balance,
         }));
       } catch (error) {
         console.warn('Failed to fetch recipient balance:', error);
-        setFormState(prev => ({ 
-          ...prev, 
-          isValidAddress: true, 
-          isValidatingAddress: false, 
-          recipientBalance: null 
+        setFormState(prev => ({
+          ...prev,
+          isValidAddress: true,
+          isValidatingAddress: false,
+          recipientBalance: null,
         }));
       }
     } else {
-      setFormState(prev => ({ 
-        ...prev, 
-        isValidAddress: false, 
-        isValidatingAddress: false, 
-        recipientBalance: null 
+      setFormState(prev => ({
+        ...prev,
+        isValidAddress: false,
+        isValidatingAddress: false,
+        recipientBalance: null,
       }));
     }
   }, []);
@@ -281,11 +292,15 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
         }
 
         // Use optimal fee if available, otherwise fallback to default
-        const fee = optimalFee ? optimalFee.feeInSOL : DEFAULT_FEE;
-        setFormState(prev => ({ 
-          ...prev, 
-          estimatedFee: fee, 
-          totalCost: solAmount + fee 
+        const networkFee = optimalFee ? optimalFee.feeInSOL : DEFAULT_FEE;
+
+        // Calculate total cost including platform fee
+        const feeCalculation = calculateTotalCost(solAmount, networkFee);
+
+        setFormState(prev => ({
+          ...prev,
+          estimatedFee: networkFee,
+          totalCost: feeCalculation.breakdown.totalCost,
         }));
       }, 0);
     },
@@ -332,14 +347,17 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     // Get transaction details for the callback
     const currentAmount = inputMode === InputMode.CURRENCY ? currencyAmount : amount;
     const numAmount = parseFloat(currentAmount);
-    
+
+    // Convert to SOL amount if in currency mode (this is what should be sent)
+    const transactionAmount = inputMode === InputMode.CURRENCY ? solAmount : numAmount;
+
     // Close the send modal
     onClose();
-    
+
     // Notify parent component about transaction confirmation
     if (onTransactionConfirm) {
       onTransactionConfirm({
-        amount: numAmount, // Pass the original amount the user entered
+        amount: transactionAmount, // Pass SOL amount (converted if in currency mode)
         recipient: recipientAddress,
         memo: memo,
         inputMode: inputMode,
@@ -350,14 +368,12 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
     }
   };
 
-
-
   // Contact handlers
   const handleContactSelect = (contact: RecipientContact) => {
-    setFormState(prev => ({ 
-      ...prev, 
+    setFormState(prev => ({
+      ...prev,
       recipientAddress: contact.address,
-      selectedRecipientType: RecipientType.WALLET_ADDRESS 
+      selectedRecipientType: RecipientType.WALLET_ADDRESS,
     }));
   };
 
@@ -368,33 +384,33 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
   };
 
   // Calculate current values safely using useMemo to prevent render issues
-  const currentAmount = useMemo(() => 
-    inputMode === InputMode.CURRENCY ? currencyAmount : amount, 
+  const currentAmount = useMemo(
+    () => (inputMode === InputMode.CURRENCY ? currencyAmount : amount),
     [inputMode, currencyAmount, amount]
   );
 
-  // Calculate fee information
+  // Calculate fee information based on SOL amount (the actual transaction amount)
   const feeCalculation = useMemo(() => {
     const amountNum = parseFloat(currentAmount);
     if (amountNum > 0) {
+      // Convert to SOL first if in currency mode, since fees are calculated based on SOL amount
+      const solAmountForFee =
+        inputMode === InputMode.CURRENCY ? currencyToSol(amountNum) : amountNum;
       const networkFee = optimalFee?.feeInSOL || 0.000005;
-      return calculateTotalCost(amountNum, networkFee);
+      return calculateTotalCost(solAmountForFee, networkFee);
     }
     return null;
-  }, [currentAmount, optimalFee]);
-  
-  const numAmount = useMemo(() => 
-    parseFloat(currentAmount) || 0, 
-    [currentAmount]
-  );
-  
-  const solAmount = useMemo(() => 
-    inputMode === InputMode.CURRENCY ? currencyToSol(numAmount) : numAmount, 
+  }, [currentAmount, optimalFee, inputMode, currencyToSol]);
+
+  const numAmount = useMemo(() => parseFloat(currentAmount) || 0, [currentAmount]);
+
+  const solAmount = useMemo(
+    () => (inputMode === InputMode.CURRENCY ? currencyToSol(numAmount) : numAmount),
     [inputMode, currencyToSol, numAmount]
   );
-  
-  const canSend = useMemo(() => 
-    isValidAddress && isValidAmount && totalCost <= balance && !isLoading && solAmount > 0,
+
+  const canSend = useMemo(
+    () => isValidAddress && isValidAmount && totalCost <= balance && !isLoading && solAmount > 0,
     [isValidAddress, isValidAmount, totalCost, balance, isLoading, solAmount]
   );
 
@@ -427,14 +443,18 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
             {/* Recipient Selection */}
             <RecipientSelection
               selectedType={selectedRecipientType}
-              onTypeChange={(type) => setFormState(prev => ({ ...prev, selectedRecipientType: type }))}
+              onTypeChange={type =>
+                setFormState(prev => ({ ...prev, selectedRecipientType: type }))
+              }
               recipientAddress={recipientAddress}
-              onAddressChange={(address) => setFormState(prev => ({ 
-                ...prev, 
-                recipientAddress: address,
-                isValidatingAddress: address.trim() ? true : false,
-                isValidAddress: false
-              }))}
+              onAddressChange={address =>
+                setFormState(prev => ({
+                  ...prev,
+                  recipientAddress: address,
+                  isValidatingAddress: address.trim() ? true : false,
+                  isValidAddress: false,
+                }))
+              }
               contacts={contacts}
               favorites={favorites}
               onContactSelect={handleContactSelect}
@@ -463,7 +483,9 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
                       { value: InputMode.SOL, label: 'SOL' },
                     ]}
                     selectedValue={inputMode}
-                    onValueChange={value => setFormState(prev => ({ ...prev, inputMode: value as InputMode }))}
+                    onValueChange={value =>
+                      setFormState(prev => ({ ...prev, inputMode: value as InputMode }))
+                    }
                   />
                 </View>
 
@@ -475,7 +497,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
                       currentAmount && isValidAmount && { borderColor: theme.text.SUCCESS_GREEN },
                     ]}
                     value={currentAmount}
-                    onChangeText={(text) => {
+                    onChangeText={text => {
                       if (inputMode === InputMode.CURRENCY) {
                         setFormState(prev => ({ ...prev, currencyAmount: text }));
                       } else {
@@ -514,25 +536,25 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
                     onPress={() => {
                       // Calculate max amount accounting for both network fee and platform fee
                       const networkFee = estimatedFee > 0 ? estimatedFee : DEFAULT_FEE;
-                      
+
                       // Calculate platform fee for the current balance
                       const platformFee = calculatePlatformFee(balance);
-                      
+
                       // Max SOL = balance - network fee - platform fee
                       const maxSol = balance - networkFee - platformFee;
-                      
+
                       // Ensure max amount is not negative
                       const safeMaxSol = Math.max(0, maxSol);
 
                       if (inputMode === InputMode.CURRENCY) {
-                        setFormState(prev => ({ 
-                          ...prev, 
-                          currencyAmount: solToCurrency(safeMaxSol).toFixed(2) 
+                        setFormState(prev => ({
+                          ...prev,
+                          currencyAmount: solToCurrency(safeMaxSol).toFixed(2),
                         }));
                       } else {
-                        setFormState(prev => ({ 
-                          ...prev, 
-                          amount: safeMaxSol.toString() 
+                        setFormState(prev => ({
+                          ...prev,
+                          amount: safeMaxSol.toString(),
                         }));
                       }
                     }}
@@ -586,7 +608,7 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
               <InputGroup
                 label='Memo (Optional)'
                 value={memo}
-                onChangeText={(text) => setFormState(prev => ({ ...prev, memo: text }))}
+                onChangeText={text => setFormState(prev => ({ ...prev, memo: text }))}
                 placeholder='Add a note...'
                 maxLength={200}
                 style={styles.inputGroup}
@@ -611,13 +633,13 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
               )}
               {/* Network Status */}
               {optimalFee && (
-              <NetworkStatus
-                networkCongestion={optimalFee.networkCongestion}
-                estimatedTime={optimalFee.estimatedTime}
-                feeInSOL={optimalFee.feeInSOL}
-                countdown={countdown}
-                isRefreshing={isRefreshingFees}
-              />
+                <NetworkStatus
+                  networkCongestion={optimalFee.networkCongestion}
+                  estimatedTime={optimalFee.estimatedTime}
+                  feeInSOL={optimalFee.feeInSOL}
+                  countdown={countdown}
+                  isRefreshing={isRefreshingFees}
+                />
               )}
             </GradientCard>
 
@@ -637,17 +659,15 @@ export default function SendSolModal({ visible, onClose, initialRecipientAddress
       <QRScanner
         visible={showQRScanner}
         onClose={() => setShowQRScanner(false)}
-        onScan={(data) => {
-          setFormState(prev => ({ 
-            ...prev, 
+        onScan={data => {
+          setFormState(prev => ({
+            ...prev,
             recipientAddress: data,
             isValidatingAddress: data.trim() ? true : false,
-            isValidAddress: false
+            isValidAddress: false,
           }));
         }}
       />
-
-
     </Modal>
   );
 }

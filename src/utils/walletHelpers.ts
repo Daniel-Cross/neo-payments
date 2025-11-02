@@ -80,24 +80,36 @@ export interface FeeCalculation {
 }
 
 /**
- * Calculate platform fee based on transaction amount
- * Simple structure: 3 cents per SOL, minimum 3 cents
+ * Calculate platform fee - tiered fee structure
+ * 0.0002 SOL for transactions under 1 SOL
+ * 0.0004 SOL for transactions 1 SOL to under 2 SOL
+ * 0.0006 SOL for transactions 2 SOL to under 3 SOL
+ * And so on (0.0002 * tier number)
+ * @param transactionAmount - Transaction amount in SOL
+ * @returns Platform fee in SOL
  */
 export const calculatePlatformFee = (transactionAmount: number): number => {
-  const FEE_PER_SOL = 0.03; // 3 cents per SOL
-  const MIN_FEE_SOL = 0.03; // 3 cents minimum
+  if (transactionAmount <= 0) {
+    return 0;
+  }
 
-  // Calculate fee: 3 cents per SOL
-  const fee = transactionAmount * FEE_PER_SOL;
+  // Calculate which tier the transaction falls into
+  // Tier 1: 0 < amount < 1 → fee 0.0002
+  // Tier 2: 1 <= amount < 2 → fee 0.0004
+  // Tier 3: 2 <= amount < 3 → fee 0.0006
+  // etc.
+  const tier = Math.floor(transactionAmount) + 1;
 
-  // Apply minimum fee of 3 cents for transactions under 1 SOL
-  const finalFee = Math.max(MIN_FEE_SOL, fee);
+  // Fee is 0.0002 SOL multiplied by tier number
+  const fee = tier * 0.0002;
 
-  return Math.round(finalFee * 1000000000) / 1000000000; // Round to 9 decimal places (lamports precision)
+  return Math.round(fee * 1000000000) / 1000000000; // Round to 9 decimal places (lamports precision)
 };
 
 /**
  * Calculate total transaction cost including platform fee and network fee
+ * @param transactionAmount - Transaction amount in SOL
+ * @param networkFee - Network fee in SOL (default: 0.000005)
  */
 export const calculateTotalCost = (
   transactionAmount: number,
